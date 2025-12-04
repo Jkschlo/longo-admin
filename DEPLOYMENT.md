@@ -125,6 +125,79 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 ## Troubleshooting
 
+### Vercel Not Auto-Deploying on GitHub Commits
+
+If your changes aren't automatically deploying when you push to GitHub, try these steps:
+
+#### 1. Check GitHub Integration
+
+1. Go to your Vercel project dashboard
+2. Navigate to **Settings** > **Git**
+3. Verify that your GitHub repository is connected
+4. If disconnected or incorrect:
+   - Click "Disconnect" or "Change Repository"
+   - Reconnect your GitHub repository
+   - Ensure you grant Vercel the necessary permissions
+
+#### 2. Verify Production Branch
+
+1. Go to **Settings** > **Git**
+2. Check the **Production Branch** setting
+3. Ensure it matches your main branch (`main` or `master`)
+4. If incorrect, update it and save
+
+#### 3. Check GitHub Webhooks
+
+1. Go to your GitHub repository on GitHub.com
+2. Navigate to **Settings** > **Webhooks**
+3. Look for a webhook pointing to `vercel.com`
+4. If missing or shows errors:
+   - Go back to Vercel
+   - Disconnect and reconnect the GitHub integration
+   - This will recreate the webhook
+
+#### 4. Verify Repository Access
+
+1. In Vercel, go to **Settings** > **Git**
+2. Ensure the correct GitHub account/organization is connected
+3. Check that Vercel has access to the repository:
+   - Go to GitHub repository settings
+   - Navigate to **Settings** > **Integrations** > **Vercel**
+   - Ensure permissions are granted
+
+#### 5. Manual Deployment Test
+
+1. In Vercel dashboard, go to **Deployments** tab
+2. Click the "..." menu on your latest deployment
+3. Select "Redeploy" to test if manual deployment works
+4. If manual works but auto-deploy doesn't, it's a webhook/integration issue
+
+#### 6. Check Deployment Settings
+
+1. Go to **Settings** > **Git**
+2. Verify **Automatic deployments from Git** is enabled
+3. Check **Production Branch** matches your actual branch name
+4. Review **Ignore Build Step** - ensure it's not blocking deployments
+
+#### 7. Common Fix: Reconnect Repository
+
+If none of the above works:
+
+1. Go to **Settings** > **Git**
+2. Click "Disconnect" for the current repository
+3. Go to your project overview
+4. Click "Connect Git Repository"
+5. Select your repository again
+6. This will refresh the integration and recreate webhooks
+
+#### 8. Check GitHub Repository Settings
+
+On GitHub:
+1. Go to repository **Settings** > **Webhooks**
+2. Look for Vercel webhook (URL should contain `vercel.com`)
+3. Check recent deliveries for any errors
+4. If you see 401/403 errors, reconnect the integration
+
 ### Build Fails
 
 - Check Node.js version (should be 18+)

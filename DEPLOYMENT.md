@@ -1,0 +1,167 @@
+# Deployment Guide
+
+This guide covers deploying the Longo Admin Dashboard to various platforms.
+
+## Vercel (Recommended)
+
+Vercel is the easiest way to deploy Next.js applications.
+
+### Step 1: Prepare Your Repository
+
+1. Push your code to GitHub
+2. Ensure all environment variables are documented in `.env.example`
+
+### Step 2: Deploy to Vercel
+
+1. Go to [vercel.com](https://vercel.com) and sign in
+2. Click "Add New Project"
+3. Import your GitHub repository
+4. Configure the project:
+   - **Framework Preset**: Next.js (auto-detected)
+   - **Root Directory**: `./` (or `longo-admin` if in monorepo)
+   - **Build Command**: `npm run build` (default)
+   - **Output Directory**: `.next` (default)
+
+### Step 3: Add Environment Variables
+
+In the Vercel project settings:
+
+1. Go to **Settings** > **Environment Variables**
+2. Add the following variables:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+3. Set them for all environments (Production, Preview, Development)
+4. Click "Save"
+
+### Step 4: Deploy
+
+1. Click "Deploy"
+2. Wait for the build to complete
+3. Your app will be live at `https://your-project.vercel.app`
+
+### Step 5: Configure Custom Domain (Optional)
+
+1. Go to **Settings** > **Domains**
+2. Add your custom domain
+3. Follow DNS configuration instructions
+
+## Netlify
+
+### Step 1: Build Settings
+
+1. Go to [netlify.com](https://netlify.com) and sign in
+2. Click "Add new site" > "Import an existing project"
+3. Connect your GitHub repository
+4. Configure build settings:
+   - **Build command**: `npm run build`
+   - **Publish directory**: `.next`
+   - **Base directory**: `longo-admin` (if in monorepo)
+
+### Step 2: Environment Variables
+
+1. Go to **Site settings** > **Environment variables**
+2. Add all required environment variables
+3. Save
+
+### Step 3: Deploy
+
+Netlify will automatically deploy on every push to your main branch.
+
+## Railway
+
+### Step 1: Create Project
+
+1. Go to [railway.app](https://railway.app) and sign in
+2. Click "New Project"
+3. Select "Deploy from GitHub repo"
+4. Choose your repository
+
+### Step 2: Configure
+
+1. Railway will auto-detect Next.js
+2. Add environment variables in the **Variables** tab
+3. Deploy
+
+## Render
+
+### Step 1: Create Web Service
+
+1. Go to [render.com](https://render.com) and sign in
+2. Click "New" > "Web Service"
+3. Connect your GitHub repository
+
+### Step 2: Configure
+
+- **Name**: longo-admin
+- **Environment**: Node
+- **Build Command**: `npm install && npm run build`
+- **Start Command**: `npm start`
+
+### Step 3: Environment Variables
+
+Add all required environment variables in the **Environment** section.
+
+## Environment Variables for Production
+
+Make sure to set these in your deployment platform:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+## Post-Deployment Checklist
+
+- [ ] Verify environment variables are set
+- [ ] Test login functionality
+- [ ] Verify API routes work
+- [ ] Check image uploads
+- [ ] Test on mobile devices
+- [ ] Set up custom domain (if applicable)
+- [ ] Configure email templates in Supabase
+- [ ] Update password reset redirect URL in Supabase
+
+## Troubleshooting
+
+### Build Fails
+
+- Check Node.js version (should be 18+)
+- Verify all environment variables are set
+- Check build logs for specific errors
+
+### Environment Variables Not Working
+
+- Ensure variables start with `NEXT_PUBLIC_` for client-side access
+- Restart the deployment after adding variables
+- Check for typos in variable names
+
+### API Routes Not Working
+
+- Verify `SUPABASE_SERVICE_ROLE_KEY` is set
+- Check Supabase project is active
+- Review server logs for errors
+
+## Continuous Deployment
+
+All platforms support automatic deployments:
+
+- **Vercel**: Automatic on push to main branch
+- **Netlify**: Automatic on push to main branch
+- **Railway**: Automatic on push to main branch
+- **Render**: Automatic on push to main branch
+
+Configure branch protection and preview deployments as needed.
+
+## Security Notes
+
+- Never commit `.env.local` or `.env` files
+- Use environment variables in your deployment platform
+- Rotate `SUPABASE_SERVICE_ROLE_KEY` periodically
+- Enable 2FA on your deployment accounts
+- Review access logs regularly
+
+---
+
+For more help, see the main [README.md](README.md) or open an issue.

@@ -86,14 +86,14 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin.from("profiles").delete().eq("id", userId);
 
     // 5. Delete from auth.users (requires admin/service role)
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
       userId
     );
 
-    if (deleteError) {
-      console.error("Auth delete error:", deleteError);
+    if (authError) {
+      console.error("Auth delete error:", authError);
       return NextResponse.json(
-        { error: `Failed to delete auth user: ${deleteError.message}` },
+        { error: `Failed to delete auth user: ${authError.message}` },
         { status: 500 }
       );
     }

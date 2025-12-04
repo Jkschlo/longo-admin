@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Additional validation: check file extension matches content type
-    const originalFileName = (file as any).name || "";
-    const fileExtension = originalFileName.split(".").pop()?.toLowerCase() || "";
+    const fileName = (file as any).name || "";
+    const fileExtension = fileName.split(".").pop()?.toLowerCase() || "";
     
     if (isPDF && fileExtension !== "pdf") {
       return NextResponse.json(

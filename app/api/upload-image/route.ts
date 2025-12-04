@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdminClient";
-import { randomUUID } from "crypto";
+import { v4 as uuidv4 } from "uuid";
 
 export const runtime = "nodejs";
 
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       : "jpg";
 
     // 🔧 FIXED duplicate variable
-    const finalFileName = `${randomUUID()}.${ext}`;
+    const finalFileName = `${uuidv4()}.${ext}`;
     const filePath = `${folder}/${finalFileName}`;
 
     // Determine content type

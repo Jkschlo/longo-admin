@@ -54,8 +54,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. DELETE USER from auth.users (SERVICE ROLE REQUIRED)
-    const { error: deleteErr } =
-      await supabaseAdmin.auth.admin.deleteUser(userId);
+    // Type assertion needed for Turbopack build compatibility
+    const adminAuth = supabaseAdmin.auth.admin;
+    const { error: deleteErr } = await (adminAuth as any).deleteUser(userId);
 
     if (deleteErr) {
       console.error("Error deleting user from auth.users:", deleteErr);

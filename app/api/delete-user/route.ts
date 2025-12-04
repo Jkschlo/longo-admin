@@ -1,41 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth, verifyAdminAuth } from "@/lib/auth-utils";
+import { supabaseAdmin } from "@/lib/supabaseAdminClient";
 
 export async function POST(request: NextRequest) {
   try {
     // Verify admin authentication
     const authError = await requireAdminAuth(request);
     if (authError) return authError;
-
-    // Check for required env vars
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      console.error("Missing NEXT_PUBLIC_SUPABASE_URL");
-      return NextResponse.json(
-        { error: "Server configuration error: Missing Supabase URL" },
-        { status: 500 }
-      );
-    }
-
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
-      return NextResponse.json(
-        { error: "Server configuration error: Missing service role key. Add SUPABASE_SERVICE_ROLE_KEY to .env.local" },
-        { status: 500 }
-      );
-    }
-
-    // Create admin client with service role key (server-side only)
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
 
     const body = await request.json();
     const { userId } = body;
@@ -86,14 +57,14 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin.from("profiles").delete().eq("id", userId);
 
     // 5. Delete from auth.users (requires admin/service role)
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(
       userId
     );
 
-    if (authError) {
-      console.error("Auth delete error:", authError);
+    if (deleteError) {
+      console.error("Auth delete error:", deleteError);
       return NextResponse.json(
-        { error: `Failed to delete auth user: ${authError.message}` },
+        { error: `Failed to delete auth user: ${deleteError.message}` },
         { status: 500 }
       );
     }

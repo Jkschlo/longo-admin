@@ -527,13 +527,14 @@ export default function AnalyticsPage() {
     filteredAttempts.forEach((attempt) => {
       if (!attempt.answers) return;
 
+      const answers = attempt.answers; // Store in local variable for type narrowing
       const moduleQuestions = questions
         .filter((q) => q.module_id === attempt.module_id)
         .sort((a, b) => a.order_index - b.order_index);
 
       moduleQuestions.forEach((q, index) => {
         const answerKey = index.toString();
-        const userAnswer = attempt.answers[answerKey];
+        const userAnswer = answers[answerKey];
         if (!userAnswer) return;
 
         if (!stats[q.id]) {

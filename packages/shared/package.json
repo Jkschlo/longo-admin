@@ -1,0 +1,22 @@
+{
+  "name": "@longo/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities, types, and configurations for Longo projects",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.80.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0"
+  }
+}
+

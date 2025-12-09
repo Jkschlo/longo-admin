@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@longo/shared": ["../packages/shared/src"]
     }
   },
   "include": [

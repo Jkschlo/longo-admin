@@ -15,31 +15,10 @@ export default function LoginPage() {
   const [lockedUntil, setLockedUntil] = useState<Date | null>(null);
 
   /** 
-   * Check if user is already logged in and redirect if admin
+   * Don't check for existing sessions - require manual login
+   * The dashboard will handle redirecting here if needed
    */
-  useEffect(() => {
-    const checkExistingSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        // Check if user is admin
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("is_admin")
-          .eq("id", session.user.id)
-          .maybeSingle();
-        
-        if (profile?.is_admin) {
-          router.replace("/dashboard");
-        } else {
-          // Not admin, sign out
-          await supabase.auth.signOut();
-        }
-      }
-    };
-    
-    checkExistingSession();
-  }, [router]);
+  // Removed auto-login check - users must manually enter credentials
 
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();

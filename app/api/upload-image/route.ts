@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const bucketName = "training-media";
 
     // Upload using service role
-    const { error: uploadError } = await supabaseAdmin.storage
+    const { error: uploadError, data: uploadData } = await supabaseAdmin.storage
       .from(bucketName)
       .upload(filePath, buffer, {
         contentType,
@@ -58,8 +58,20 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
+      console.error("Bucket:", bucketName);
+      console.error("File path:", filePath);
+      console.error("Error details:", JSON.stringify(uploadError, null, 2));
+      
+      // Provide more helpful error messages
+      let errorMessage = uploadError.message;
+      if (uploadError.message?.includes("not found") || uploadError.message?.includes("Bucket")) {
+        errorMessage = `Storage bucket "${bucketName}" not found. Please create it in Supabase Storage.`;
+      } else if (uploadError.message?.includes("policy") || uploadError.message?.includes("permission")) {
+        errorMessage = `Permission denied. Please check bucket policies in Supabase Storage.`;
+      }
+      
       return NextResponse.json(
-        { error: uploadError.message },
+        { error: errorMessage, details: uploadError.message },
         { status: 500 }
       );
     }

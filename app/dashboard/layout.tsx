@@ -38,10 +38,22 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [email, setEmail] = useState("");
+  const [isLoadingEmail, setIsLoadingEmail] = useState(true);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const mountedRef = useRef(true);
 
-  const fetchUser = useCallback(async () => {
+  const fetchUser = useCallback(async (isInitialCheck = false) => {
     if (!mountedRef.current) return;
+    
+    // Only set loading state on initial check to prevent email disappearing on refresh
+    if (isInitialCheck && mountedRef.current) {
+      setIsAuthChecking(true);
+      setIsLoadingEmail(true);
+    } else if (!isInitialCheck && mountedRef.current) {
+      // For subsequent checks, only set email loading, not auth checking
+      setIsLoadingEmail(true);
+    }
+    
     try {
       const sessionResp = await withTimeout<
         Awaited<ReturnType<typeof supabase.auth.getSession>>
@@ -54,6 +66,12 @@ export default function AdminLayout({
       // If there is a session error, log and retry later (do not interrupt UX)
       if (sessionError) {
         console.warn("Session check error:", sessionError);
+        if (mountedRef.current) {
+          setIsLoadingEmail(false);
+          if (isInitialCheck) {
+            setIsAuthChecking(false);
+          }
+        }
         return;
       }
 
@@ -64,6 +82,8 @@ export default function AdminLayout({
           // Ignore sign out errors
         }
         if (mountedRef.current) {
+          setIsLoadingEmail(false);
+          setIsAuthChecking(false);
           router.replace("/login");
         }
         return;
@@ -90,34 +110,50 @@ export default function AdminLayout({
 
       if (profError || !prof?.is_admin) {
         await supabase.auth.signOut();
-        router.replace("/login");
+        if (mountedRef.current) {
+          setIsLoadingEmail(false);
+          setIsAuthChecking(false);
+          router.replace("/login");
+        }
         return;
       }
 
-      setEmail(prof.email || "");
+      // Set email and clear loading state
+      if (mountedRef.current) {
+        setEmail(prof.email || "");
+        setIsLoadingEmail(false);
+        if (isInitialCheck) {
+          setIsAuthChecking(false);
+        }
+      }
     } catch (err: unknown) {
       console.error("Auth check error:", err);
+      if (mountedRef.current) {
+        setIsLoadingEmail(false);
+        if (isInitialCheck) {
+          setIsAuthChecking(false);
+        }
+      }
     }
   }, [router]);
 
   useEffect(() => {
     mountedRef.current = true;
     let authCheckInterval: NodeJS.Timeout | null = null;
+    
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        fetchUser();
+      if (document.visibilityState === "visible" && mountedRef.current) {
+        fetchUser(false);
       }
     };
 
-    // Initial check (defer to avoid sync setState warning)
-    setTimeout(() => {
-      fetchUser();
-    }, 0);
+    // Initial check - fetch user data immediately (mark as initial check)
+    fetchUser(true);
 
-    // Set up session monitoring - check every 5 minutes
+    // Set up session monitoring - check every 5 minutes for security
     authCheckInterval = setInterval(() => {
       if (mountedRef.current) {
-        fetchUser();
+        fetchUser(false);
       }
     }, 5 * 60 * 1000);
 
@@ -129,12 +165,16 @@ export default function AdminLayout({
         if (!mountedRef.current) return;
 
         if (event === "SIGNED_OUT" || !session) {
-          router.replace("/login");
+          if (mountedRef.current) {
+            setIsLoadingEmail(false);
+            router.replace("/login");
+          }
           return;
         }
 
         if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
-          await fetchUser();
+          // Refresh user data when token is refreshed or user signs in (not initial check)
+          await fetchUser(false);
         }
       }
     );
@@ -194,19 +234,39 @@ export default function AdminLayout({
     }
   );
 
+  // Show loading overlay during initial auth check
+  if (isAuthChecking) {
+    return (
+      <div className="flex h-screen bg-gray-50 items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#0A2C57] border-r-transparent"></div>
+          <p className="mt-4 text-gray-600">Verifying authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800">
       {/* Sidebar */}
       <aside className="w-64 bg-[#0A2C57] text-white flex flex-col justify-between shadow-xl">
         <div>
           <div className="flex items-center justify-center py-6 border-b border-white/10">
-            <Image
-              src="/longologo.png"
-              alt="Longo Logo"
-              width={180}
-              height={50}
-              priority
-            />
+            <a
+              href="https://longotraining.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+              title="Go to Longo Training"
+            >
+              <Image
+                src="/longologo.png"
+                alt="Longo Logo"
+                width={180}
+                height={50}
+                priority
+              />
+            </a>
           </div>
 
           <nav className="mt-6 space-y-1">
@@ -231,7 +291,18 @@ export default function AdminLayout({
         </div>
 
         <div className="border-t border-white/10 p-4 flex items-center justify-between">
-          <span className="text-xs text-white/70 truncate w-32">{email}</span>
+          <span 
+            className="text-xs text-white/70 truncate w-32" 
+            title={email || "Loading..."}
+          >
+            {isLoadingEmail ? (
+              <span className="inline-block w-20 h-3 bg-white/20 rounded animate-pulse">Loading...</span>
+            ) : email ? (
+              email
+            ) : (
+              <span className="text-white/50">No email</span>
+            )}
+          </span>
           <button
             onClick={handleLogout}
             className="text-white/80 hover:text-white transition-colors cursor-pointer"

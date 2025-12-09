@@ -98,7 +98,12 @@ export default function AdminLayout({
       }
 
       // Verify admin access with timeout
-      const profileResp = await withTimeout(
+      type ProfileResponse = {
+        data: { is_admin: boolean | null; email: string | null } | null;
+        error: { message?: string } | null;
+      };
+
+      const profileResp = await withTimeout<ProfileResponse>(
         supabase
           .from("profiles")
           .select("is_admin, email")

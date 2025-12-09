@@ -1641,7 +1641,7 @@ export default function ModulesPage() {
                                                                       if (!input) {
                                                                         const allPDFInputs = document.querySelectorAll('input[type="file"][accept*="pdf"]');
                                                                         console.log("Found PDF inputs:", allPDFInputs.length);
-                                                                        for (let inp of Array.from(allPDFInputs)) {
+                                                                        for (const inp of Array.from(allPDFInputs)) {
                                                                           if (inp.id.includes(blockId) || inp.id.includes(String(globalIndex))) {
                                                                             input = inp as HTMLInputElement;
                                                                             console.log("Found input by fallback:", inp.id);
@@ -1792,7 +1792,7 @@ export default function ModulesPage() {
                                                         console.log("Found PDF inputs:", allInputs.length);
                                                         
                                                         // Find the one without content (newly created)
-                                                        for (let input of Array.from(allInputs)) {
+                                                        for (const input of Array.from(allInputs)) {
                                                           const inputId = input.id;
                                                           const blockId = inputId.replace('content-pdf-', '');
                                                           // Check if this block has no content yet

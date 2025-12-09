@@ -44,7 +44,7 @@ export default function SessionTimeoutModal({
 
           {/* Message */}
           <p className="text-gray-700 mb-6">
-            You've been inactive for a while. Your session will expire in{" "}
+            You&apos;ve been inactive for a while. Your session will expire in{" "}
             <span className="font-semibold text-[#0A2C57]">{formattedTime}</span>{" "}
             for security reasons. Would you like to continue your session?
           </p>

@@ -22,8 +22,8 @@ export default function PrivacyPolicyPage() {
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-[#0A2C57] mb-4">1. Introduction</h2>
             <p className="text-gray-700 leading-relaxed mb-4">
-              Longo Carpet Cleaning ("we," "our," or "us") operates the Longo Training App and 
-              Admin Dashboard (the "Services"). This Privacy Policy explains how we collect, use, 
+              Longo Carpet Cleaning (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) operates the Longo Training App and 
+              Admin Dashboard (the &quot;Services&quot;). This Privacy Policy explains how we collect, use, 
               disclose, and safeguard your information when you use our services.
             </p>
           </section>
@@ -121,7 +121,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold text-[#0A2C57] mb-4">8. Children's Privacy</h2>
+            <h2 className="text-2xl font-bold text-[#0A2C57] mb-4">8. Children&apos;s Privacy</h2>
             <p className="text-gray-700 leading-relaxed mb-4">
               The Services are not intended for children under the age of 13. We do not knowingly 
               collect personal information from children under 13. If you believe we have collected 
@@ -144,7 +144,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-bold text-[#0A2C57] mb-4">10. Changes to This Privacy Policy</h2>
             <p className="text-gray-700 leading-relaxed mb-4">
               We may update this Privacy Policy from time to time. We will notify you of any changes 
-              by posting the new Privacy Policy on this page and updating the "Last Updated" date. 
+              by posting the new Privacy Policy on this page and updating the &quot;Last Updated&quot; date. 
               You are advised to review this Privacy Policy periodically for any changes. Changes 
               to this Privacy Policy are effective when they are posted on this page.
             </p>

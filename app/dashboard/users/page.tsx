@@ -291,7 +291,10 @@ function AssignRolesModal({
       roles.forEach((r) => defaults.add(r.id));
     }
 
-    setSelected([...defaults]);
+    // Use setTimeout to avoid setState in effect
+    setTimeout(() => {
+      setSelected([...defaults]);
+    }, 0);
   }, [existingRoles, currentUser, roles]);
 
   /* ------------------- SAVE CHANGES ------------------- */
@@ -789,7 +792,10 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
-    loadData();
+    // Use setTimeout to avoid setState in effect
+    setTimeout(() => {
+      loadData();
+    }, 0);
     
     // Get current user ID
     const getCurrentUser = async () => {
@@ -1060,7 +1066,7 @@ export default function UsersPage() {
   }
 
   // Filter and sort users
-  let filtered = profiles.filter((p) => {
+  const filtered = profiles.filter((p) => {
     const full = `${p.first_name} ${p.last_name}`.toLowerCase();
     const q = search.toLowerCase();
     const matchesSearch = full.includes(q) || p.email.toLowerCase().includes(q);

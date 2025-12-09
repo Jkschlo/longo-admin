@@ -22,7 +22,7 @@ export default function TermsOfServicePage() {
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-[#0A2C57] mb-4">1. Acceptance of Terms</h2>
             <p className="text-gray-700 leading-relaxed mb-4">
-              By accessing and using the Longo Training App and Admin Dashboard (the "Services"), 
+              By accessing and using the Longo Training App and Admin Dashboard (the &quot;Services&quot;), 
               you accept and agree to be bound by the terms and provision of this agreement. If you 
               do not agree to abide by the above, please do not use these services.
             </p>
@@ -40,7 +40,7 @@ export default function TermsOfServicePage() {
               <li>Use the materials for any unauthorized commercial purpose</li>
               <li>Attempt to reverse engineer, decompile, or disassemble any software</li>
               <li>Remove any copyright or other proprietary notations</li>
-              <li>Transfer the materials to another person or "mirror" the materials on any other server</li>
+              <li>Transfer the materials to another person or &quot;mirror&quot; the materials on any other server</li>
             </ul>
           </section>
 
@@ -97,7 +97,7 @@ export default function TermsOfServicePage() {
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-[#0A2C57] mb-4">7. Disclaimer</h2>
             <p className="text-gray-700 leading-relaxed mb-4">
-              The materials in the Services are provided on an 'as is' basis. Longo Carpet Cleaning 
+              The materials in the Services are provided on an &apos;as is&apos; basis. Longo Carpet Cleaning 
               makes no warranties, expressed or implied, and hereby disclaims and negates all other 
               warranties including, without limitation, implied warranties or conditions of merchantability, 
               fitness for a particular purpose, or non-infringement of intellectual property or other 

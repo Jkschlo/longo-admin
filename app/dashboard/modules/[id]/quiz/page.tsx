@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { authenticatedFetch } from "@/lib/api-client";
@@ -15,7 +15,6 @@ import {
   Circle,
   ClipboardList,
   X,
-  Upload,
   Image as ImageIcon,
 } from "lucide-react";
 
@@ -70,7 +69,7 @@ export default function QuizBuilderPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   // fetch module & quiz questions
-  const fetchQuizData = async () => {
+  const fetchQuizData = useCallback(async () => {
     setLoading(true);
 
     const [{ data: mod }, { data: qs }] = await Promise.all([
@@ -86,11 +85,11 @@ export default function QuizBuilderPage() {
     if (qs) setQuestions(qs);
 
     setLoading(false);
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchQuizData();
-  }, [id]);
+  }, [fetchQuizData]);
 
   // ---------------- Reset Form ----------------
   const resetForm = () => {

@@ -1,3 +1,5 @@
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable jsx-a11y/alt-text */
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -64,7 +66,6 @@ export default function ModulesPage() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editModuleId, setEditModuleId] = useState<string | null>(null);
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
-  const [preselectedCategoryId, setPreselectedCategoryId] = useState<string | null>(null);
 
   // Module form
   const [moduleForm, setModuleForm] = useState({
@@ -681,7 +682,7 @@ export default function ModulesPage() {
       await syncModuleJSON(editModuleId, blocksToSave);
     } else {
       // Create new module
-      const { data, error } = await supabase.from("modules").insert([{ title: moduleForm.title, description: moduleForm.description, category_id: moduleForm.category_id, cover_image: imageUrl, is_active: moduleForm.is_active }]).select("id").single();
+      const { data } = await supabase.from("modules").insert([{ title: moduleForm.title, description: moduleForm.description, category_id: moduleForm.category_id, cover_image: imageUrl, is_active: moduleForm.is_active }]).select("id").single();
       
       if (data && blocks.length > 0) {
         // Save all blocks for the new module
@@ -1315,7 +1316,7 @@ export default function ModulesPage() {
                         };
                       }
 
-                      blocks.forEach((block, i) => {
+                      blocks.forEach((block) => {
                         if (block.type === "section") {
                           // Save previous section if exists
                           if (currentSection) {
@@ -1377,7 +1378,6 @@ export default function ModulesPage() {
                               <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
                                 {sections.map(({ section, blocks: sectionBlocks, sectionIndex }) => {
                                   const isExpanded = expandedSections.has(sectionIndex);
-                                  const sectionBlockIndex = blocks.findIndex((b) => b.id === section.id);
 
                                   return (
                                     <div
@@ -1445,7 +1445,7 @@ export default function ModulesPage() {
                                                   No content in this section. Add content below.
                                                 </p>
                                               ) : (
-                                                sectionBlocks.map((block, blockIndex) => {
+                                                sectionBlocks.map((block) => {
                                                   const globalIndex = blocks.findIndex((b) => b.id === block.id);
                                                   return (
                                                     <Draggable

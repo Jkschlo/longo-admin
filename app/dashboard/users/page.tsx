@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { authenticatedFetch } from "@/lib/api-client";
 import { motion, AnimatePresence } from "framer-motion";
@@ -739,7 +739,7 @@ export default function UsersPage() {
   }
 
   /* ------------------------- LOAD DATA --------------------------- */
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
 
     const { data: profs } = await supabase
@@ -789,7 +789,7 @@ export default function UsersPage() {
     });
 
     setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     // Use setTimeout to avoid setState in effect
@@ -805,7 +805,7 @@ export default function UsersPage() {
       }
     };
     getCurrentUser();
-  }, []);
+  }, [loadData]);
 
   const attemptsMap = useMemo(() => {
     const out: Record<string, Attempt[]> = {};
@@ -932,69 +932,6 @@ export default function UsersPage() {
       console.error("Password reset error:", error);
       alert("Failed to send password reset email. Please try again.");
     }
-  }
-
-  // Calculate total modules for a user based on their roles
-  function getTotalModulesForUser(userId: string, isAdmin: boolean): number {
-    // Early return if data not loaded
-    if (!modules.length || !categories.length) {
-      return 0;
-    }
-
-    if (isAdmin) {
-      // Admins see all active modules
-      return modules.filter((m) => m.is_active !== false).length;
-    }
-
-    // Always include New Hire role, plus any other assigned roles
-    const userRoles = new Set([NEW_HIRE_ROLE]);
-    if (userRolesMap[userId]?.length > 0) {
-      userRolesMap[userId].forEach((rid) => userRoles.add(rid));
-    }
-
-    // Get all categories accessible to this user (based on their roles)
-    const accessibleCategoryIds = new Set<string>();
-    categories.forEach((cat) => {
-      // Check if category is active and has a role_id that matches user's roles
-      if (cat.is_active !== false && cat.role_id) {
-        if (userRoles.has(cat.role_id)) {
-          accessibleCategoryIds.add(cat.id);
-        }
-      }
-    });
-
-    // Count active modules in accessible categories
-    const count = modules.filter((m) => {
-      return (
-        m.is_active !== false &&
-        m.category_id &&
-        accessibleCategoryIds.has(m.category_id)
-      );
-    }).length;
-
-    return count;
-  }
-
-  // Calculate completed modules for a user
-  // Count modules that are either:
-  // 1. Completed via quiz (quiz_attempts with passed = true), OR
-  // 2. Completed without quiz (module_progress with status = "complete")
-  function getCompletedModulesForUser(userId: string): number {
-    const completedModuleIds = new Set<string>();
-    
-    // Add modules completed via quiz attempts
-    const userAttempts = attemptsMap[userId] || [];
-    userAttempts
-      .filter((x) => x.passed)
-      .forEach((x) => completedModuleIds.add(x.module_id));
-    
-    // Add modules completed without quiz (from module_progress)
-    const userProgress = moduleProgress.filter((mp) => mp.user_id === userId);
-    userProgress
-      .filter((mp) => mp.status === "complete")
-      .forEach((mp) => completedModuleIds.add(mp.module_id));
-    
-    return completedModuleIds.size;
   }
 
   function exportCSV() {

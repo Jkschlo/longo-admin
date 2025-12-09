@@ -19,7 +19,6 @@ import {
   Search,
   BarChart2,
   Clock,
-  Users,
   TrendingUp,
   AlertCircle,
   CheckCircle2,
@@ -401,7 +400,7 @@ export default function AnalyticsPage() {
     // Filter by role
     if (selectedRole !== "all") {
       const userIdsWithRole = Object.entries(userRolesMap)
-        .filter(([_, roleIds]) => roleIds.includes(selectedRole))
+        .filter(([, roleIds]) => roleIds.includes(selectedRole))
         .map(([userId]) => userId);
       filtered = filtered.filter((a) => userIdsWithRole.includes(a.user_id));
     }
@@ -415,13 +414,6 @@ export default function AnalyticsPage() {
     modules.forEach((m) => (map[m.id] = m.title));
     return map;
   }, [modules]);
-
-  // Question map
-  const questionMap = useMemo(() => {
-    const map: Record<string, Question> = {};
-    questions.forEach((q) => (map[q.id] = q));
-    return map;
-  }, [questions]);
 
   // General Stats
   const generalStats = useMemo(() => {
@@ -955,7 +947,7 @@ export default function AnalyticsPage() {
                   </td>
                 </tr>
               ) : (
-                questionStats.slice(0, 20).map((stat, idx) => (
+                questionStats.slice(0, 20).map((stat) => (
                   <tr key={stat.questionId} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="max-w-md">

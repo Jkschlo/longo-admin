@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { LogOut, BookOpen, Layers, Users, FileDown } from "lucide-react";
+import { LogOut, Layers, Users, FileDown } from "lucide-react";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import SessionTimeoutModal from "@/components/SessionTimeoutModal";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
@@ -40,7 +40,7 @@ export default function AdminLayout({
             // Token is invalid, sign out silently
             try {
               await supabase.auth.signOut();
-            } catch (signOutError) {
+            } catch {
               // Ignore sign out errors
             }
             if (mounted) {
@@ -51,7 +51,7 @@ export default function AdminLayout({
           // Other errors - sign out and redirect
           try {
             await supabase.auth.signOut();
-          } catch (signOutError) {
+          } catch {
             // Ignore sign out errors
           }
           if (mounted) {
@@ -63,7 +63,7 @@ export default function AdminLayout({
         if (!user) {
           try {
             await supabase.auth.signOut();
-          } catch (signOutError) {
+          } catch {
             // Ignore sign out errors
           }
           if (mounted) {
@@ -100,14 +100,14 @@ export default function AdminLayout({
           // Silently handle refresh token errors
           try {
             await supabase.auth.signOut();
-          } catch (signOutError) {
+          } catch {
             // Ignore sign out errors
           }
         } else {
           console.error("Auth check error:", err);
           try {
             await supabase.auth.signOut();
-          } catch (signOutError) {
+          } catch {
             // Ignore sign out errors
           }
         }
@@ -148,7 +148,7 @@ export default function AdminLayout({
             console.error("Token refresh error:", err);
             try {
               await supabase.auth.signOut();
-            } catch (signOutError) {
+            } catch {
               // Ignore sign out errors
             }
             if (mounted) {

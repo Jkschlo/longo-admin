@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { LogOut, BookOpen, Layers, Users, FileDown } from "lucide-react";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
+import SessionTimeoutModal from "@/components/SessionTimeoutModal";
 
 export default function AdminLayout({
   children,
@@ -26,9 +28,46 @@ export default function AdminLayout({
 
         if (!mounted) return;
 
-        if (error || !user) {
-          await supabase.auth.signOut();
-          router.replace("/login");
+        // Handle token refresh errors gracefully
+        if (error) {
+          // Check if it's a refresh token error
+          if (
+            error.message?.includes("Refresh Token") ||
+            error.message?.includes("refresh_token") ||
+            error.name === "AuthApiError"
+          ) {
+            // Token is invalid, sign out silently
+            try {
+              await supabase.auth.signOut();
+            } catch (signOutError) {
+              // Ignore sign out errors
+            }
+            if (mounted) {
+              router.replace("/login");
+            }
+            return;
+          }
+          // Other errors - sign out and redirect
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            // Ignore sign out errors
+          }
+          if (mounted) {
+            router.replace("/login");
+          }
+          return;
+        }
+
+        if (!user) {
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            // Ignore sign out errors
+          }
+          if (mounted) {
+            router.replace("/login");
+          }
           return;
         }
 
@@ -48,10 +87,28 @@ export default function AdminLayout({
         }
 
         setEmail(prof.email);
-      } catch (err) {
-        console.error("Auth check error:", err);
+      } catch (err: any) {
+        // Handle errors gracefully, especially refresh token errors
+        if (
+          err?.message?.includes("Refresh Token") ||
+          err?.message?.includes("refresh_token") ||
+          err?.name === "AuthApiError"
+        ) {
+          // Silently handle refresh token errors
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            // Ignore sign out errors
+          }
+        } else {
+          console.error("Auth check error:", err);
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            // Ignore sign out errors
+          }
+        }
         if (mounted) {
-          await supabase.auth.signOut();
           router.replace("/login");
         }
       }
@@ -73,11 +130,32 @@ export default function AdminLayout({
         if (!mounted) return;
 
         if (event === "SIGNED_OUT" || !session) {
-          router.replace("/login");
+          if (mounted) {
+            router.replace("/login");
+          }
           return;
         }
 
-        if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
+        // Handle token refresh errors
+        if (event === "TOKEN_REFRESHED") {
+          try {
+            await fetchUser();
+          } catch (err) {
+            // If token refresh fails, sign out
+            console.error("Token refresh error:", err);
+            try {
+              await supabase.auth.signOut();
+            } catch (signOutError) {
+              // Ignore sign out errors
+            }
+            if (mounted) {
+              router.replace("/login");
+            }
+          }
+          return;
+        }
+
+        if (event === "SIGNED_IN") {
           await fetchUser();
         }
       }
@@ -107,9 +185,35 @@ export default function AdminLayout({
   ];
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      // Ignore sign out errors - we'll redirect anyway
+      console.error("Logout error:", error);
+    }
     router.replace("/login");
   };
+
+  // Session timeout handler
+  const handleSessionTimeout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      // Ignore sign out errors - we'll redirect anyway
+      console.error("Session timeout logout error:", error);
+    }
+    router.replace("/login");
+  };
+
+  // Use session timeout hook
+  const { showWarning, timeRemaining, extendSession } = useSessionTimeout(
+    handleSessionTimeout,
+    {
+      warningTime: 14 * 60 * 1000, // Show warning after 14 minutes of inactivity
+      timeoutTime: 15 * 60 * 1000, // Auto-logout after 15 minutes of inactivity
+      checkInterval: 60 * 1000, // Check every minute
+    }
+  );
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800">
@@ -161,6 +265,14 @@ export default function AdminLayout({
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-8">{children}</main>
+
+      {/* Session Timeout Modal */}
+      <SessionTimeoutModal
+        visible={showWarning}
+        timeRemaining={timeRemaining}
+        onExtend={extendSession}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

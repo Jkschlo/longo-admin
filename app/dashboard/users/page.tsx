@@ -85,6 +85,10 @@ function ManageRolesModal({
 }) {
   const [roleName, setRoleName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteRoleConfirm, setDeleteRoleConfirm] = useState<{
+    id: string | null;
+    name: string;
+  }>({ id: null, name: "" });
 
   async function createRole() {
     if (!roleName.trim()) return;
@@ -122,11 +126,19 @@ function ManageRolesModal({
       return;
     }
 
-    if (!confirm("Delete this role?")) return;
-
-    await supabase.from("roles").delete().eq("id", id);
-    await refreshRoles();
+    const role = roles.find((r) => r.id === id);
+    if (role) {
+      setDeleteRoleConfirm({ id: role.id, name: role.name });
+    }
   }
+
+  const confirmRoleDelete = async () => {
+    if (!deleteRoleConfirm.id) return;
+
+    await supabase.from("roles").delete().eq("id", deleteRoleConfirm.id);
+    setDeleteRoleConfirm({ id: null, name: "" });
+    await refreshRoles();
+  };
 
   if (!open) return null;
 
@@ -194,6 +206,50 @@ function ManageRolesModal({
           ))}
         </div>
       </motion.div>
+
+      {/* Delete Role Confirmation Modal */}
+      {deleteRoleConfirm.id && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative"
+          >
+            {/* Warning Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2 size={32} className="text-red-600" />
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-2xl font-bold text-[#0A2C57] text-center mb-2">
+              Delete Role?
+            </h2>
+
+            {/* Warning Message */}
+            <p className="text-gray-600 text-center mb-4">
+              This will permanently delete the role <span className="font-bold">{deleteRoleConfirm.name}</span>. This action cannot be undone.
+            </p>
+
+            {/* Buttons */}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setDeleteRoleConfirm({ id: null, name: "" })}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRoleDelete}
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition cursor-pointer"
+              >
+                Delete
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

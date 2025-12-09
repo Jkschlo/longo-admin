@@ -41,9 +41,13 @@ export async function POST(req: NextRequest) {
       file.type ||
       (ext === "pdf" ? "application/pdf" : "image/jpeg");
 
+    // Determine bucket based on folder
+    // Use "training-media" bucket for all uploads (quiz-questions, module-content, etc.)
+    const bucketName = "training-media";
+
     // Upload using service role
     const { error: uploadError } = await supabaseAdmin.storage
-      .from("training-content")
+      .from(bucketName)
       .upload(filePath, buffer, {
         contentType,
         upsert: true,
@@ -59,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     // Return public URL
     const { data: publicUrlData } = supabaseAdmin.storage
-      .from("training-content")
+      .from(bucketName)
       .getPublicUrl(filePath);
 
     return NextResponse.json(

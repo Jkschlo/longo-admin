@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -8,6 +8,27 @@ import { LogOut, Layers, Users, FileDown } from "lucide-react";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import SessionTimeoutModal from "@/components/SessionTimeoutModal";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  label: string,
+  ms = 10000
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out. Please try again.`));
+    }, ms);
+    promise
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
 
 export default function AdminLayout({
   children,
@@ -20,26 +41,6 @@ export default function AdminLayout({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
-
-  const withTimeout = useCallback(
-    async <T,>(promise: Promise<T>, label: string, ms = 10000): Promise<T> => {
-      return new Promise<T>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          reject(new Error(`${label} timed out. Please try again.`));
-        }, ms);
-        promise
-          .then((result) => {
-            clearTimeout(timer);
-            resolve(result);
-          })
-          .catch((err) => {
-            clearTimeout(timer);
-            reject(err);
-          });
-      });
-    },
-    []
-  );
 
   const fetchUser = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -125,7 +126,7 @@ export default function AdminLayout({
       setError(errorMessage);
       setLoading(false);
     }
-  }, [router, withTimeout]);
+  }, [router]);
 
   useEffect(() => {
     mountedRef.current = true;

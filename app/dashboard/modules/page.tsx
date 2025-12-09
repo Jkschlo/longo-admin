@@ -24,6 +24,7 @@ interface Module {
   description: string | null;
   category_id: string;
   cover_image: string | null;
+  sop_url: string | null;
   is_active: boolean;
   created_at?: string;
 }
@@ -104,6 +105,13 @@ export default function ModulesPage() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "category" | "module" | null; id: string | null; name: string }>({ type: null, id: null, name: "" });
+
+  // SOP upload states
+  const [isSOPModalOpen, setIsSOPModalOpen] = useState(false);
+  const [sopUrl, setSopUrl] = useState<string | null>(null);
+  const [sopFile, setSopFile] = useState<File | null>(null);
+  const [sopPreviewUrl, setSopPreviewUrl] = useState<string | null>(null);
+  const [uploadingSOP, setUploadingSOP] = useState(false);
 
   /* ------------------------------------------------------------------
      Fetch Data
@@ -479,6 +487,142 @@ export default function ModulesPage() {
   };
 
   /* ------------------------------------------------------------------
+     SOP Upload Handlers
+  ------------------------------------------------------------------ */
+  const openSOPModal = () => {
+    setSopFile(null);
+    setUploadError(null);
+    setIsSOPModalOpen(true);
+  };
+
+  const handleSOPFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Check file type
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setUploadError("Please upload a PDF file.");
+      return;
+    }
+    
+    setSopFile(file);
+    setSopPreviewUrl(URL.createObjectURL(file));
+    setUploadError(null);
+  };
+
+  const handleSOPSave = async () => {
+    if (!editModuleId) return;
+    
+    if (!sopFile && !sopUrl) {
+      setUploadError("Please select a PDF file.");
+      return;
+    }
+    
+    setUploadingSOP(true);
+    setUploadError(null);
+    
+    try {
+      let finalSopUrl = sopUrl;
+      
+      // If a new file was selected, upload it
+      if (sopFile) {
+        const formData = new FormData();
+        formData.append("file", sopFile);
+        formData.append("folder", "module-content");
+        
+        const response = await authenticatedFetch("/api/upload-image", {
+          method: "POST",
+          body: formData,
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          setUploadError(result.error || "SOP upload failed. Please try again.");
+          setUploadingSOP(false);
+          return;
+        }
+        
+        if (!result.url) {
+          setUploadError("Upload succeeded but no URL returned. Please try again.");
+          setUploadingSOP(false);
+          return;
+        }
+        
+        finalSopUrl = result.url;
+      }
+      
+      // Update module with SOP URL
+      const { error } = await supabase
+        .from("modules")
+        .update({ sop_url: finalSopUrl })
+        .eq("id", editModuleId);
+      
+      if (error) {
+        setUploadError("Failed to save SOP. Please try again.");
+        setUploadingSOP(false);
+        return;
+      }
+      
+      // Update local state
+      setSopUrl(finalSopUrl);
+      setSopPreviewUrl(finalSopUrl);
+      
+      // Update modules list
+      setModules((prev) =>
+        prev.map((m) => (m.id === editModuleId ? { ...m, sop_url: finalSopUrl } : m))
+      );
+      
+      setIsSOPModalOpen(false);
+      setSopFile(null);
+      setUploadError(null);
+    } catch (err: unknown) {
+      console.error("SOP upload error:", err);
+      setUploadError("SOP upload failed. Please try again.");
+    } finally {
+      setUploadingSOP(false);
+    }
+  };
+
+  const handleSOPDelete = async () => {
+    if (!editModuleId) return;
+    
+    setUploadingSOP(true);
+    setUploadError(null);
+    
+    try {
+      const { error } = await supabase
+        .from("modules")
+        .update({ sop_url: null })
+        .eq("id", editModuleId);
+      
+      if (error) {
+        setUploadError("Failed to delete SOP. Please try again.");
+        setUploadingSOP(false);
+        return;
+      }
+      
+      // Update local state
+      setSopUrl(null);
+      setSopPreviewUrl(null);
+      
+      // Update modules list
+      setModules((prev) =>
+        prev.map((m) => (m.id === editModuleId ? { ...m, sop_url: null } : m))
+      );
+      
+      setIsSOPModalOpen(false);
+      setSopFile(null);
+      setUploadError(null);
+    } catch (err: unknown) {
+      console.error("SOP delete error:", err);
+      setUploadError("Failed to delete SOP. Please try again.");
+    } finally {
+      setUploadingSOP(false);
+    }
+  };
+
+  /* ------------------------------------------------------------------
      Category CRUD
   ------------------------------------------------------------------ */
   const openCategoryModal = (cat?: Category) => {
@@ -581,6 +725,8 @@ export default function ModulesPage() {
       setEditModuleId(mod.id);
       setModuleForm({ title: mod.title, description: mod.description || "", category_id: mod.category_id, cover_image: mod.cover_image || "", is_active: mod.is_active });
       setPreviewUrl(mod.cover_image || null);
+      setSopUrl(mod.sop_url || null);
+      setSopPreviewUrl(mod.sop_url || null);
       const loadedBlocks = await loadBlocks(mod.id);
       setBlocks(loadedBlocks);
       
@@ -603,6 +749,8 @@ export default function ModulesPage() {
       setEditModuleId(null);
       setModuleForm({ title: "", description: "", category_id: categoryId || "", cover_image: "", is_active: true });
       setPreviewUrl(null);
+      setSopUrl(null);
+      setSopPreviewUrl(null);
       setBlocks([]);
       setHasQuiz(false);
       setExpandedSections(new Set());
@@ -643,7 +791,7 @@ export default function ModulesPage() {
 
     if (editModuleId) {
       // Update existing module
-      await supabase.from("modules").update({ title: moduleForm.title, description: moduleForm.description, category_id: moduleForm.category_id, cover_image: imageUrl, is_active: moduleForm.is_active }).eq("id", editModuleId);
+      await supabase.from("modules").update({ title: moduleForm.title, description: moduleForm.description, category_id: moduleForm.category_id, cover_image: imageUrl, sop_url: sopUrl, is_active: moduleForm.is_active }).eq("id", editModuleId);
       
       // Save all blocks (including any temp ones that need to be created)
       const blocksToSave = blocks.map((b, i) => ({
@@ -682,7 +830,7 @@ export default function ModulesPage() {
       await syncModuleJSON(editModuleId, blocksToSave);
     } else {
       // Create new module
-      const { data } = await supabase.from("modules").insert([{ title: moduleForm.title, description: moduleForm.description, category_id: moduleForm.category_id, cover_image: imageUrl, is_active: moduleForm.is_active }]).select("id").single();
+      const { data } = await supabase.from("modules").insert([{ title: moduleForm.title, description: moduleForm.description, category_id: moduleForm.category_id, cover_image: imageUrl, sop_url: sopUrl, is_active: moduleForm.is_active }]).select("id").single();
       
       if (data && blocks.length > 0) {
         // Save all blocks for the new module
@@ -1118,12 +1266,20 @@ export default function ModulesPage() {
                 </h2>
                 <div className="flex items-center gap-3">
                   {editModuleId && (
-                    <button
-                      onClick={() => (window.location.href = `/dashboard/modules/${editModuleId}/quiz`)}
-                      className="bg-[#E8F4FA] text-[#0A2C57] px-4 py-2 rounded-lg font-semibold hover:bg-[#d3edf9] cursor-pointer transition shadow-sm hover:shadow-md"
-                    >
-                      {hasQuiz ? "Edit Quiz" : "Create Quiz"}
-                    </button>
+                    <>
+                      <button
+                        onClick={openSOPModal}
+                        className="bg-[#E8F4FA] text-[#0A2C57] px-4 py-2 rounded-lg font-semibold hover:bg-[#d3edf9] cursor-pointer transition shadow-sm hover:shadow-md"
+                      >
+                        {sopUrl ? "Change SOP" : "Upload SOP"}
+                      </button>
+                      <button
+                        onClick={() => (window.location.href = `/dashboard/modules/${editModuleId}/quiz`)}
+                        className="bg-[#E8F4FA] text-[#0A2C57] px-4 py-2 rounded-lg font-semibold hover:bg-[#d3edf9] cursor-pointer transition shadow-sm hover:shadow-md"
+                      >
+                        {hasQuiz ? "Edit Quiz" : "Create Quiz"}
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => setIsModuleModalOpen(false)}
@@ -1883,6 +2039,99 @@ export default function ModulesPage() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================ */}
+      {/* SOP UPLOAD MODAL */}
+      {/* ================================================================ */}
+      {isSOPModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-8 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-[#0A2C57]">
+                  {sopUrl ? "Change SOP" : "Upload SOP"}
+                </h2>
+                <button
+                  onClick={() => {
+                    setIsSOPModalOpen(false);
+                    setSopFile(null);
+                    setUploadError(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition cursor-pointer p-1 rounded-lg hover:bg-gray-100"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col flex-1 overflow-hidden p-8">
+              <div className="flex-1 overflow-y-auto space-y-6">
+                {/* PDF Preview */}
+                {(sopPreviewUrl || sopUrl) && (
+                  <div className="w-full rounded-lg border-2 border-gray-200 overflow-hidden bg-gray-100 flex flex-col items-center justify-center" style={{ height: '500px' }}>
+                    <iframe
+                      src={sopPreviewUrl || sopUrl || ""}
+                      className="w-full h-full"
+                      title="SOP Preview"
+                    />
+                  </div>
+                )}
+
+                {/* File Upload */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    {sopUrl ? "Change PDF File" : "Upload PDF File"}
+                  </label>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleSOPFileSelect}
+                    className="w-full border-2 border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-[#6EC1E4] focus:border-[#6EC1E4] transition cursor-pointer"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Only PDF files are allowed</p>
+                </div>
+
+                {/* Error Message */}
+                {uploadError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                    {uploadError}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+                {sopUrl && (
+                  <button
+                    onClick={handleSOPDelete}
+                    disabled={uploadingSOP}
+                    className="px-4 py-2 border-2 border-red-500 text-red-500 rounded-lg font-semibold hover:bg-red-50 cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Delete SOP
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setIsSOPModalOpen(false);
+                    setSopFile(null);
+                    setUploadError(null);
+                  }}
+                  className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 cursor-pointer transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSOPSave}
+                  disabled={uploadingSOP || (!sopFile && !sopUrl)}
+                  className="bg-[#6EC1E4] hover:bg-[#5bb7de] text-white px-5 py-2 rounded-lg font-semibold cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploadingSOP ? "Uploading..." : sopUrl ? "Change SOP" : "Upload SOP"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

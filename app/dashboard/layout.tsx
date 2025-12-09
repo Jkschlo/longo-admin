@@ -141,7 +141,10 @@ export default function AdminLayout({
     };
 
     // Initial check - fetch user data in background (non-blocking)
-    fetchUser();
+    // Use setTimeout to avoid calling setState synchronously within effect
+    setTimeout(() => {
+      fetchUser();
+    }, 0);
 
     // Set up session monitoring - check every 5 minutes for security
     authCheckInterval = setInterval(() => {

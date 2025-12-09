@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const bucketName = "training-media";
 
     // Upload using service role
-    const { error: uploadError, data: uploadData } = await supabaseAdmin.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from(bucketName)
       .upload(filePath, buffer, {
         contentType,

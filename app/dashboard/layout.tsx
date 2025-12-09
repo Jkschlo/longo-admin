@@ -38,14 +38,10 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
 
   const fetchUser = useCallback(async () => {
     if (!mountedRef.current) return;
-    setLoading(true);
-    setError(null);
     try {
       const sessionResp = await withTimeout<
         Awaited<ReturnType<typeof supabase.auth.getSession>>
@@ -58,7 +54,6 @@ export default function AdminLayout({
       // If there is a session error, log and retry later (do not interrupt UX)
       if (sessionError) {
         console.warn("Session check error:", sessionError);
-        setLoading(false);
         return;
       }
 
@@ -71,7 +66,6 @@ export default function AdminLayout({
         if (mountedRef.current) {
           router.replace("/login");
         }
-        setLoading(false);
         return;
       }
 
@@ -97,18 +91,12 @@ export default function AdminLayout({
       if (profError || !prof?.is_admin) {
         await supabase.auth.signOut();
         router.replace("/login");
-        setLoading(false);
         return;
       }
 
       setEmail(prof.email || "");
-      setLoading(false);
     } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown authentication error";
       console.error("Auth check error:", err);
-      setError(errorMessage);
-      setLoading(false);
     }
   }, [router]);
 
@@ -208,39 +196,6 @@ export default function AdminLayout({
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800">
-      {loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur">
-          <div className="flex flex-col items-center gap-3 text-[#0A2C57]">
-            <div className="h-10 w-10 rounded-full border-4 border-[#6EC1E4] border-t-transparent animate-spin" />
-            <p className="text-sm font-medium">Checking your session…</p>
-          </div>
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/90 backdrop-blur">
-          <div className="bg-white shadow-lg rounded-xl p-6 max-w-md w-full border border-gray-200">
-            <h2 className="text-lg font-semibold text-[#0A2C57] mb-2">Unable to load session</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              {error}
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => router.replace("/login")}
-                className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
-              >
-                Go to login
-              </button>
-              <button
-                onClick={() => fetchUser()}
-                className="px-4 py-2 rounded-md bg-[#0A2C57] text-white hover:bg-[#123E7A] transition"
-              >
-                Retry
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Sidebar */}
       <aside className="w-64 bg-[#0A2C57] text-white flex flex-col justify-between shadow-xl">
         <div>

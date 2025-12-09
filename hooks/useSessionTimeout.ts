@@ -34,6 +34,8 @@ export function useSessionTimeout(
       "scroll",
       "touchstart",
       "click",
+      "visibilitychange",
+      "focus",
     ],
   } = options;
 
@@ -125,7 +127,11 @@ export function useSessionTimeout(
 
     // Add event listeners for user activity
     activityEvents.forEach((event) => {
-      window.addEventListener(event, updateActivity, { passive: true });
+      if (event === "visibilitychange") {
+        document.addEventListener(event, updateActivity, { passive: true });
+      } else {
+        window.addEventListener(event, updateActivity, { passive: true });
+      }
     });
 
     // Start checking for inactivity
@@ -137,7 +143,11 @@ export function useSessionTimeout(
     return () => {
       // Cleanup
       activityEvents.forEach((event) => {
-        window.removeEventListener(event, updateActivity);
+        if (event === "visibilitychange") {
+          document.removeEventListener(event, updateActivity);
+        } else {
+          window.removeEventListener(event, updateActivity);
+        }
       });
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

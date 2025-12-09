@@ -47,44 +47,22 @@ export default function AdminLayout({
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await withTimeout<
-        Awaited<ReturnType<typeof supabase.auth.getUser>>
-      >(supabase.auth.getUser(), "Auth check");
-      const user = data?.user;
+      const sessionResp = await withTimeout<
+        Awaited<ReturnType<typeof supabase.auth.getSession>>
+      >(supabase.auth.getSession(), "Session check");
+      const session = sessionResp.data?.session;
+      const sessionError = sessionResp.error;
 
       if (!mountedRef.current) return;
 
-      // Handle token refresh errors gracefully
-      if (error) {
-        const refreshIssue =
-          error.message?.includes("Refresh Token") ||
-          error.message?.includes("refresh_token") ||
-          error.name === "AuthApiError";
-        if (refreshIssue) {
-          try {
-            await supabase.auth.signOut();
-          } catch {
-            // Ignore sign out errors
-          }
-          if (mountedRef.current) {
-            router.replace("/login");
-          }
-          setLoading(false);
-          return;
-        }
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          // Ignore sign out errors
-        }
-        if (mountedRef.current) {
-          router.replace("/login");
-        }
+      // If there is a session error, log and retry later (do not interrupt UX)
+      if (sessionError) {
+        console.warn("Session check error:", sessionError);
         setLoading(false);
         return;
       }
 
-      if (!user) {
+      if (!session?.user) {
         try {
           await supabase.auth.signOut();
         } catch {
@@ -107,7 +85,7 @@ export default function AdminLayout({
         supabase
           .from("profiles")
           .select("is_admin, email")
-          .eq("id", user.id)
+          .eq("id", session.user.id)
           .maybeSingle(),
         "Admin profile check"
       );
@@ -137,6 +115,11 @@ export default function AdminLayout({
   useEffect(() => {
     mountedRef.current = true;
     let authCheckInterval: NodeJS.Timeout | null = null;
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchUser();
+      }
+    };
 
     // Initial check (defer to avoid sync setState warning)
     setTimeout(() => {
@@ -149,6 +132,8 @@ export default function AdminLayout({
         fetchUser();
       }
     }, 5 * 60 * 1000);
+
+    document.addEventListener("visibilitychange", handleVisibility);
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -171,6 +156,7 @@ export default function AdminLayout({
       if (authCheckInterval) {
         clearInterval(authCheckInterval);
       }
+      document.removeEventListener("visibilitychange", handleVisibility);
       subscription.unsubscribe();
     };
   }, [fetchUser, router]);

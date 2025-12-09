@@ -54,9 +54,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. DELETE USER from auth.users (SERVICE ROLE REQUIRED)
-    // Type assertion needed for Turbopack build compatibility
-    const adminAuth = supabaseAdmin.auth.admin;
-    const { error: deleteErr } = await (adminAuth as any).deleteUser(userId);
+    const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(
+      userId
+    );
 
     if (deleteErr) {
       console.error("Error deleting user from auth.users:", deleteErr);
@@ -70,10 +70,11 @@ export async function POST(req: NextRequest) {
       { success: true, message: "User fully deleted" },
       { status: 200 }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Internal server error";
     console.error("Unexpected error in delete-user route:", err);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: message },
       { status: 500 }
     );
   }

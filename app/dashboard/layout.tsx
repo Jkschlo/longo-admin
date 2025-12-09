@@ -88,12 +88,14 @@ export default function AdminLayout({
         }
 
         setEmail(prof.email);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown authentication error";
         // Handle errors gracefully, especially refresh token errors
         if (
-          err?.message?.includes("Refresh Token") ||
-          err?.message?.includes("refresh_token") ||
-          err?.name === "AuthApiError"
+          errorMessage?.includes("Refresh Token") ||
+          errorMessage?.includes("refresh_token") ||
+          (err as { name?: string })?.name === "AuthApiError"
         ) {
           // Silently handle refresh token errors
           try {

@@ -79,9 +79,13 @@ function ResetPasswordForm() {
       setTimeout(() => {
         router.push("/login");
       }, 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to reset password. The link may have expired. Please request a new one.";
       console.error("Password reset error:", err);
-      setError(err.message || "Failed to reset password. The link may have expired. Please request a new one.");
+      setError(message);
     } finally {
       setLoading(false);
     }

@@ -73,6 +73,8 @@ interface Question {
   order_index: number;
 }
 
+type UserRoleRow = { user_id: string; role_id: string };
+
 // Utility
 const formatTime = (seconds: number | null) => {
   if (!seconds) return "–";
@@ -362,7 +364,7 @@ export default function AnalyticsPage() {
 
       // Build user roles map
       const map: Record<string, string[]> = {};
-      (userRolesData || []).forEach((ur: any) => {
+      (userRolesData || []).forEach((ur: UserRoleRow) => {
         if (!map[ur.user_id]) map[ur.user_id] = [];
         map[ur.user_id].push(ur.role_id);
       });

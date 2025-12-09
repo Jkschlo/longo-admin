@@ -162,9 +162,10 @@ export default function LoginPage() {
          STEP 5: Redirect to dashboard
       ----------------------------*/
       router.replace("/dashboard");
-    } catch (e: any) {
-      console.error("Login error:", e.message);
-      setError("Something went wrong. Please try again.");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Something went wrong. Please try again.";
+      console.error("Login error:", message);
+      setError(message);
     } finally {
       setLoading(false);
     }

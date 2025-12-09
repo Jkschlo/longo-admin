@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { authenticatedFetch } from "@/lib/api-client";
 import { Plus, Pencil, Trash2, Image as ImageIcon, X, ChevronDown, ChevronRight, FolderOpen, GripVertical, FileText } from "lucide-react";
 import { Switch } from "@headlessui/react";
-import Cropper from "react-easy-crop";
+import Cropper, { Area } from "react-easy-crop";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   DragDropContext,
@@ -100,7 +100,7 @@ export default function ModulesPage() {
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: "category" | "module" | null; id: string | null; name: string }>({ type: null, id: null, name: "" });
 
@@ -146,9 +146,12 @@ export default function ModulesPage() {
   /* ------------------------------------------------------------------
      Crop + Upload
   ------------------------------------------------------------------ */
-  const onCropComplete = useCallback((_: any, croppedPixels: any) => {
-    setCroppedAreaPixels(croppedPixels);
-  }, []);
+  const onCropComplete = useCallback(
+    (_: unknown, croppedPixels: Area) => {
+      setCroppedAreaPixels(croppedPixels);
+    },
+    []
+  );
 
   const createImage = (url: string): Promise<HTMLImageElement> =>
     new Promise((resolve, reject) => {
@@ -225,9 +228,11 @@ export default function ModulesPage() {
       }
       
       return result.url;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Image upload failed. Please try again.";
       console.error("Upload error:", err);
-      setUploadError(err.message || "Image upload failed. Please try again.");
+      setUploadError(message);
       return null;
     }
   };
@@ -399,7 +404,7 @@ export default function ModulesPage() {
       }
       
       await updateBlockField(blockId, "content", result.url);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Content image upload error:", err);
       setUploadError("Image upload failed. Please try again.");
     }
@@ -431,7 +436,7 @@ export default function ModulesPage() {
       try {
         const preview = URL.createObjectURL(file);
         await updateBlockField(blockId, "content", preview);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Temp PDF preview error:", err);
         setUploadError("Failed to create PDF preview.");
       }
@@ -466,7 +471,7 @@ export default function ModulesPage() {
       await updateBlockField(blockId, "content", result.url);
       console.log("PDF uploaded successfully:", result.url);
       setUploadError(""); // Clear error on success
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Content PDF upload error:", err);
       setUploadError("PDF upload failed. Please try again.");
     }

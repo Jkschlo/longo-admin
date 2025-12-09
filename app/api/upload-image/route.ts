@@ -25,7 +25,10 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const originalName = (file as any).name || "file";
+    const originalName =
+      typeof file.name === "string" && file.name.length > 0
+        ? file.name
+        : "file";
 
     // Determine extension
     const ext = originalName.includes(".")
@@ -70,10 +73,11 @@ export async function POST(req: NextRequest) {
       { url: publicUrlData.publicUrl },
       { status: 200 }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Internal server error";
     console.error("Unexpected upload-image error:", err);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: message },
       { status: 500 }
     );
   }

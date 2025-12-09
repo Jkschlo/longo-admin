@@ -163,9 +163,11 @@ export default function QuizBuilderPage() {
           body: formData,
         });
         console.log("Response received:", { status: response.status, ok: response.ok });
-      } catch (fetchErr: any) {
+      } catch (fetchErr: unknown) {
+        const message =
+          fetchErr instanceof Error ? fetchErr.message : "Network error";
         console.error("authenticatedFetch error:", fetchErr);
-        throw new Error(`Failed to connect to server: ${fetchErr.message || "Network error"}`);
+        throw new Error(`Failed to connect to server: ${message}`);
       }
 
       if (!response.ok) {
@@ -190,9 +192,10 @@ export default function QuizBuilderPage() {
 
       console.log("Upload successful, URL:", result.url);
       return result.url;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Image upload failed. Please try again.";
       console.error("Upload error:", err);
-      const errorMessage = err.message || "Image upload failed. Please try again.";
       setUploadError(errorMessage);
       return null;
     } finally {
@@ -251,9 +254,11 @@ export default function QuizBuilderPage() {
       await fetchQuizData();
       resetForm();
       setIsModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred. Please try again.";
       console.error("Unexpected error creating question:", err);
-      setUploadError(err.message || "An unexpected error occurred. Please try again.");
+      setUploadError(message);
     } finally {
       setSaving(false);
       setUploadingImage(false);
@@ -319,9 +324,11 @@ export default function QuizBuilderPage() {
       await fetchQuizData();
       resetForm();
       setIsModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred. Please try again.";
       console.error("Unexpected error updating question:", err);
-      setUploadError(err.message || "An unexpected error occurred. Please try again.");
+      setUploadError(message);
     } finally {
       setSaving(false);
       setUploadingImage(false);
@@ -349,7 +356,7 @@ export default function QuizBuilderPage() {
       .order("order_index");
 
     if (remaining) {
-      const updates = remaining.map((q: any, i: number) => ({
+      const updates = remaining.map((q: Question, i: number) => ({
         id: q.id,
         order_index: i,
       }));

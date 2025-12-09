@@ -23,7 +23,7 @@ jobs:
         run: npm ci
       
       - name: Run linter
-        run: npx next lint --dir .
+        run: npm run lint
 
   build:
     runs-on: ubuntu-latest

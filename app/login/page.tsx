@@ -138,9 +138,9 @@ export default function LoginPage() {
       }
 
       /* ---------------------------
-         STEP 5: Redirect to dashboard
+         STEP 5: Redirect to dashboard/modules
       ----------------------------*/
-      router.replace("/dashboard");
+      router.replace("/dashboard/modules");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Something went wrong. Please try again.";
       console.error("Login error:", message);

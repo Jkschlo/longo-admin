@@ -39,18 +39,14 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [email, setEmail] = useState("");
   const [isLoadingEmail, setIsLoadingEmail] = useState(true);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null = checking, true = authenticated, false = not authenticated
   const mountedRef = useRef(true);
 
-  const fetchUser = useCallback(async (isInitialCheck = false) => {
+  const fetchUser = useCallback(async () => {
     if (!mountedRef.current) return;
     
-    // Only set loading state on initial check to prevent email disappearing on refresh
-    if (isInitialCheck && mountedRef.current) {
-      setIsAuthChecking(true);
-      setIsLoadingEmail(true);
-    } else if (!isInitialCheck && mountedRef.current) {
-      // For subsequent checks, only set email loading, not auth checking
+    // Set email loading state
+    if (mountedRef.current) {
       setIsLoadingEmail(true);
     }
     
@@ -68,22 +64,20 @@ export default function AdminLayout({
         console.warn("Session check error:", sessionError);
         if (mountedRef.current) {
           setIsLoadingEmail(false);
-          if (isInitialCheck) {
-            setIsAuthChecking(false);
-          }
         }
         return;
       }
 
       if (!session?.user) {
+        // No session - redirect to login immediately
         try {
           await supabase.auth.signOut();
         } catch {
           // Ignore sign out errors
         }
         if (mountedRef.current) {
+          setIsAuthenticated(false);
           setIsLoadingEmail(false);
-          setIsAuthChecking(false);
           router.replace("/login");
         }
         return;
@@ -109,30 +103,29 @@ export default function AdminLayout({
       if (!mountedRef.current) return;
 
       if (profError || !prof?.is_admin) {
+        // Not admin or error - redirect to login
         await supabase.auth.signOut();
         if (mountedRef.current) {
+          setIsAuthenticated(false);
           setIsLoadingEmail(false);
-          setIsAuthChecking(false);
           router.replace("/login");
         }
         return;
       }
 
-      // Set email and clear loading state
+      // User is authenticated and is admin
       if (mountedRef.current) {
         setEmail(prof.email || "");
+        setIsAuthenticated(true);
         setIsLoadingEmail(false);
-        if (isInitialCheck) {
-          setIsAuthChecking(false);
-        }
       }
     } catch (err: unknown) {
       console.error("Auth check error:", err);
+      // On error, redirect to login for security
       if (mountedRef.current) {
+        setIsAuthenticated(false);
         setIsLoadingEmail(false);
-        if (isInitialCheck) {
-          setIsAuthChecking(false);
-        }
+        router.replace("/login");
       }
     }
   }, [router]);
@@ -143,17 +136,17 @@ export default function AdminLayout({
     
     const handleVisibility = () => {
       if (document.visibilityState === "visible" && mountedRef.current) {
-        fetchUser(false);
+        fetchUser();
       }
     };
 
-    // Initial check - fetch user data immediately (mark as initial check)
-    fetchUser(true);
+    // Initial check - fetch user data in background (non-blocking)
+    fetchUser();
 
     // Set up session monitoring - check every 5 minutes for security
     authCheckInterval = setInterval(() => {
       if (mountedRef.current) {
-        fetchUser(false);
+        fetchUser();
       }
     }, 5 * 60 * 1000);
 
@@ -166,6 +159,7 @@ export default function AdminLayout({
 
         if (event === "SIGNED_OUT" || !session) {
           if (mountedRef.current) {
+            setIsAuthenticated(false);
             setIsLoadingEmail(false);
             router.replace("/login");
           }
@@ -173,8 +167,8 @@ export default function AdminLayout({
         }
 
         if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
-          // Refresh user data when token is refreshed or user signs in (not initial check)
-          await fetchUser(false);
+          // Refresh user data when token is refreshed or user signs in
+          await fetchUser();
         }
       }
     );
@@ -234,16 +228,12 @@ export default function AdminLayout({
     }
   );
 
-  // Show loading overlay during initial auth check
-  if (isAuthChecking) {
-    return (
-      <div className="flex h-screen bg-gray-50 items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#0A2C57] border-r-transparent"></div>
-          <p className="mt-4 text-gray-600">Verifying authentication...</p>
-        </div>
-      </div>
-    );
+  // If authentication status is unknown (null), show nothing while checking
+  // If not authenticated (false), redirect will happen, show nothing
+  // Only show dashboard if authenticated (true)
+  if (isAuthenticated !== true) {
+    // Auth check in progress or user not authenticated - redirect will happen
+    return null;
   }
 
   return (

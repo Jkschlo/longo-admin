@@ -47,10 +47,9 @@ export default function AdminLayout({
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await withTimeout(
-        supabase.auth.getUser(),
-        "Auth check"
-      );
+      const { data, error } = await withTimeout<
+        Awaited<ReturnType<typeof supabase.auth.getUser>>
+      >(supabase.auth.getUser(), "Auth check");
       const user = data?.user;
 
       if (!mountedRef.current) return;
@@ -99,7 +98,7 @@ export default function AdminLayout({
       }
 
       // Verify admin access with timeout
-      const { data: prof, error: profError } = await withTimeout(
+      const profileResp = await withTimeout(
         supabase
           .from("profiles")
           .select("is_admin, email")
@@ -107,6 +106,8 @@ export default function AdminLayout({
           .maybeSingle(),
         "Admin profile check"
       );
+      const prof = profileResp.data;
+      const profError = profileResp.error;
 
       if (!mountedRef.current) return;
 

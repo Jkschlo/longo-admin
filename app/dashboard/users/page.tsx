@@ -749,7 +749,7 @@ export default function UsersPage() {
       .select("*");
 
     const map: Record<string, string[]> = {};
-    (userRoleRows || []).forEach((r) => {
+    (userRoleRows || []).forEach((r: { user_id: string; role_id: string }) => {
       if (!map[r.user_id]) map[r.user_id] = [];
       map[r.user_id].push(r.role_id);
     });

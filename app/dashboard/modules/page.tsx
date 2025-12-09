@@ -580,8 +580,8 @@ export default function ModulesPage() {
       
       // Auto-expand all sections when opening
       const sectionIndices = loadedBlocks
-        .map((b, i) => (b.type === "section" ? i : -1))
-        .filter((i) => i !== -1);
+        .map((b: ContentBlock, i: number) => (b.type === "section" ? i : -1))
+        .filter((i: number) => i !== -1);
       setExpandedSections(new Set(sectionIndices));
       
       // Check if quiz exists

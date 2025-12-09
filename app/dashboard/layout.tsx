@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { LogOut, BookOpen, Layers, Users, FileDown } from "lucide-react";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import SessionTimeoutModal from "@/components/SessionTimeoutModal";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 export default function AdminLayout({
   children,
@@ -126,7 +127,7 @@ export default function AdminLayout({
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return;
 
         if (event === "SIGNED_OUT" || !session) {

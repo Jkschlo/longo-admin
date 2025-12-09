@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -17,112 +17,128 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    let mounted = true;
-    let authCheckInterval: NodeJS.Timeout | null = null;
+  const withTimeout = useCallback(
+    async <T,>(promise: Promise<T>, label: string, ms = 10000): Promise<T> => {
+      return new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error(`${label} timed out. Please try again.`));
+        }, ms);
+        promise
+          .then((result) => {
+            clearTimeout(timer);
+            resolve(result);
+          })
+          .catch((err) => {
+            clearTimeout(timer);
+            reject(err);
+          });
+      });
+    },
+    []
+  );
 
-    const fetchUser = async () => {
-      try {
-        const { data, error } = await supabase.auth.getUser();
-        const user = data?.user;
+  const fetchUser = useCallback(async () => {
+    if (!mountedRef.current) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.getUser(),
+        "Auth check"
+      );
+      const user = data?.user;
 
-        if (!mounted) return;
+      if (!mountedRef.current) return;
 
-        // Handle token refresh errors gracefully
-        if (error) {
-          // Check if it's a refresh token error
-          if (
-            error.message?.includes("Refresh Token") ||
-            error.message?.includes("refresh_token") ||
-            error.name === "AuthApiError"
-          ) {
-            // Token is invalid, sign out silently
-            try {
-              await supabase.auth.signOut();
-            } catch {
-              // Ignore sign out errors
-            }
-            if (mounted) {
-              router.replace("/login");
-            }
-            return;
-          }
-          // Other errors - sign out and redirect
+      // Handle token refresh errors gracefully
+      if (error) {
+        const refreshIssue =
+          error.message?.includes("Refresh Token") ||
+          error.message?.includes("refresh_token") ||
+          error.name === "AuthApiError";
+        if (refreshIssue) {
           try {
             await supabase.auth.signOut();
           } catch {
             // Ignore sign out errors
           }
-          if (mounted) {
+          if (mountedRef.current) {
             router.replace("/login");
           }
+          setLoading(false);
           return;
         }
-
-        if (!user) {
-          try {
-            await supabase.auth.signOut();
-          } catch {
-            // Ignore sign out errors
-          }
-          if (mounted) {
-            router.replace("/login");
-          }
-          return;
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Ignore sign out errors
         }
+        if (mountedRef.current) {
+          router.replace("/login");
+        }
+        setLoading(false);
+        return;
+      }
 
-        // Verify admin access
-        const { data: prof, error: profError } = await supabase
+      if (!user) {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Ignore sign out errors
+        }
+        if (mountedRef.current) {
+          router.replace("/login");
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Verify admin access with timeout
+      const { data: prof, error: profError } = await withTimeout(
+        supabase
           .from("profiles")
           .select("is_admin, email")
           .eq("id", user.id)
-          .maybeSingle();
+          .maybeSingle(),
+        "Admin profile check"
+      );
 
-        if (!mounted) return;
+      if (!mountedRef.current) return;
 
-        if (profError || !prof?.is_admin) {
-          await supabase.auth.signOut();
-          router.replace("/login");
-          return;
-        }
-
-        setEmail(prof.email);
-      } catch (err: unknown) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Unknown authentication error";
-        // Handle errors gracefully, especially refresh token errors
-        if (
-          errorMessage?.includes("Refresh Token") ||
-          errorMessage?.includes("refresh_token") ||
-          (err as { name?: string })?.name === "AuthApiError"
-        ) {
-          // Silently handle refresh token errors
-          try {
-            await supabase.auth.signOut();
-          } catch {
-            // Ignore sign out errors
-          }
-        } else {
-          console.error("Auth check error:", err);
-          try {
-            await supabase.auth.signOut();
-          } catch {
-            // Ignore sign out errors
-          }
-        }
-        if (mounted) {
-          router.replace("/login");
-        }
+      if (profError || !prof?.is_admin) {
+        await supabase.auth.signOut();
+        router.replace("/login");
+        setLoading(false);
+        return;
       }
-    };
 
-    // Initial check
-    fetchUser();
+      setEmail(prof.email);
+      setLoading(false);
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown authentication error";
+      console.error("Auth check error:", err);
+      setError(errorMessage);
+      setLoading(false);
+    }
+  }, [router, withTimeout]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    let authCheckInterval: NodeJS.Timeout | null = null;
+
+    // Initial check (defer to avoid sync setState warning)
+    setTimeout(() => {
+      fetchUser();
+    }, 0);
 
     // Set up session monitoring - check every 5 minutes
     authCheckInterval = setInterval(() => {
-      if (mounted) {
+      if (mountedRef.current) {
         fetchUser();
       }
     }, 5 * 60 * 1000);
@@ -130,48 +146,27 @@ export default function AdminLayout({
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
 
         if (event === "SIGNED_OUT" || !session) {
-          if (mounted) {
-            router.replace("/login");
-          }
+          router.replace("/login");
           return;
         }
 
-        // Handle token refresh errors
-        if (event === "TOKEN_REFRESHED") {
-          try {
-            await fetchUser();
-          } catch (err) {
-            // If token refresh fails, sign out
-            console.error("Token refresh error:", err);
-            try {
-              await supabase.auth.signOut();
-            } catch {
-              // Ignore sign out errors
-            }
-            if (mounted) {
-              router.replace("/login");
-            }
-          }
-          return;
-        }
-
-        if (event === "SIGNED_IN") {
+        if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
           await fetchUser();
         }
       }
     );
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
       if (authCheckInterval) {
         clearInterval(authCheckInterval);
       }
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [fetchUser, router]);
 
   const navItems = [
     {
@@ -220,6 +215,39 @@ export default function AdminLayout({
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800">
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur">
+          <div className="flex flex-col items-center gap-3 text-[#0A2C57]">
+            <div className="h-10 w-10 rounded-full border-4 border-[#6EC1E4] border-t-transparent animate-spin" />
+            <p className="text-sm font-medium">Checking your session…</p>
+          </div>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/90 backdrop-blur">
+          <div className="bg-white shadow-lg rounded-xl p-6 max-w-md w-full border border-gray-200">
+            <h2 className="text-lg font-semibold text-[#0A2C57] mb-2">Unable to load session</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              {error}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => router.replace("/login")}
+                className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+              >
+                Go to login
+              </button>
+              <button
+                onClick={() => fetchUser()}
+                className="px-4 py-2 rounded-md bg-[#0A2C57] text-white hover:bg-[#123E7A] transition"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Sidebar */}
       <aside className="w-64 bg-[#0A2C57] text-white flex flex-col justify-between shadow-xl">
         <div>

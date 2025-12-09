@@ -123,7 +123,7 @@ export default function AdminLayout({
         return;
       }
 
-      setEmail(prof.email);
+      setEmail(prof.email || "");
       setLoading(false);
     } catch (err: unknown) {
       const errorMessage =

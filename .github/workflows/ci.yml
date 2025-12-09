@@ -38,7 +38,13 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm install
+        run: |
+          # Install dependencies
+          npm install
+          # Workaround for npm bug with optional dependencies for @tailwindcss/oxide
+          # Remove the package and reinstall to trigger optional dependency installation
+          rm -rf node_modules/@tailwindcss/oxide
+          npm install @tailwindcss/oxide --no-save --force
       
       - name: Build
         run: npm run build

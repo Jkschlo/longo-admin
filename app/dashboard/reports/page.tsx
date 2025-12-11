@@ -158,6 +158,11 @@ function LeaderboardSection({
 
         const stats = calculateUserStats(profile);
 
+        // Calculate weighted score: completed modules get 100x weight, completion rate gets 1x weight
+        // This ensures users who complete more modules rank higher, regardless of completion rate
+        // Example: 10 modules @ 20% = 1000.2, 2 modules @ 100% = 200.1
+        const weightedScore = (stats.completed * 100) + (stats.completionRate * 1);
+
         return {
           id: profile.id,
           name: name.trim() || "Unknown User",
@@ -165,16 +170,17 @@ function LeaderboardSection({
           completedModules: stats.completed,
           totalModules: stats.totalModules,
           completionRate: stats.completionRate,
+          weightedScore: weightedScore,
         };
       })
       .sort((a, b) => {
-        // Primary sort: completed modules (descending)
+        // Primary sort: weighted score (descending) - heavily favors total completed modules
+        if (Math.abs(b.weightedScore - a.weightedScore) > 0.01) {
+          return b.weightedScore - a.weightedScore;
+        }
+        // Tie-breaker: completed modules (descending) - in case of rare exact score match
         if (b.completedModules !== a.completedModules) {
           return b.completedModules - a.completedModules;
-        }
-        // Tie-breaker: completion rate (descending) - higher completion rate wins
-        if (Math.abs(b.completionRate - a.completionRate) > 0.0001) {
-          return b.completionRate - a.completionRate;
         }
         // Final tie-breaker: name (alphabetical)
         return a.name.localeCompare(b.name);

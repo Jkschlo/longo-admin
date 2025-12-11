@@ -157,8 +157,8 @@ export default function PrivacyPolicyPage() {
             </p>
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-gray-700 font-semibold mb-2">Longo Carpet Cleaning</p>
-              <p className="text-gray-700">Email: [Your Contact Email]</p>
-              <p className="text-gray-700">Address: [Your Business Address]</p>
+              <p className="text-gray-700">Email: </p>
+              <p className="text-gray-700">Address:</p>
             </div>
           </section>
         </div>

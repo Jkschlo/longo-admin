@@ -41,44 +41,103 @@ export default function AdminLayout({
   const [isLoadingEmail, setIsLoadingEmail] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null = checking, true = authenticated, false = not authenticated
   const mountedRef = useRef(true);
+  const extendSessionRef = useRef<(() => void) | null>(null);
 
-  const fetchUser = useCallback(async () => {
+  // Session timeout handler - defined early so it can be used in session timeout hook
+  const handleSessionTimeout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      // Ignore sign out errors - we'll redirect anyway
+      console.error("Session timeout logout error:", error);
+    }
+    router.replace("/login");
+  }, [router]);
+
+  // Use session timeout hook - must be defined before fetchUser so extendSession is available
+  const { showWarning, timeRemaining, extendSession } = useSessionTimeout(
+    handleSessionTimeout,
+    {
+      warningTime: 14 * 60 * 1000, // Show warning after 14 minutes of inactivity
+      timeoutTime: 15 * 60 * 1000, // Auto-logout after 15 minutes of inactivity
+      checkInterval: 60 * 1000, // Check every minute
+    }
+  );
+
+  // Store extendSession in ref so fetchUser can use it
+  extendSessionRef.current = extendSession;
+
+  const fetchUser = useCallback(async (isInitialCheck = false) => {
     if (!mountedRef.current) return;
     
-    // Set email loading state
-    if (mountedRef.current) {
+    // Set email loading state (only if we don't already have email to avoid flicker)
+    if (mountedRef.current && (!email || isInitialCheck)) {
       setIsLoadingEmail(true);
     }
     
     try {
       const sessionResp = await withTimeout<
         Awaited<ReturnType<typeof supabase.auth.getSession>>
-      >(supabase.auth.getSession(), "Session check");
+      >(supabase.auth.getSession(), "Session check", 15000); // Increased timeout to 15s
       const session = sessionResp.data?.session;
       const sessionError = sessionResp.error;
 
       if (!mountedRef.current) return;
 
-      // If there is a session error, log and retry later (do not interrupt UX)
+      // If there is a session error, log and don't redirect - let session timeout handle it
+      // Only redirect if it's a clear authentication error, not a network issue
       if (sessionError) {
-        console.warn("Session check error:", sessionError);
-        if (mountedRef.current) {
-          setIsLoadingEmail(false);
+        // Check if it's a real auth error (invalid token, etc.) vs network/timeout
+        const isAuthError = sessionError.message?.includes("JWT") || 
+                           sessionError.message?.includes("token") ||
+                           sessionError.message?.includes("expired") ||
+                           sessionError.message?.includes("invalid");
+        
+        if (isAuthError) {
+          // Real auth error - session is invalid
+          console.warn("Session authentication error:", sessionError);
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            // Ignore sign out errors
+          }
+          if (mountedRef.current) {
+            setIsAuthenticated(false);
+            setIsLoadingEmail(false);
+            router.replace("/login");
+          }
+          return;
+        } else {
+          // Network/timeout error - don't redirect, just log
+          console.warn("Session check network error (non-critical):", sessionError.message);
+          if (mountedRef.current) {
+            setIsLoadingEmail(false);
+          }
+          return;
         }
-        return;
       }
 
       if (!session?.user) {
-        // No session - redirect to login immediately
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          // Ignore sign out errors
-        }
-        if (mountedRef.current) {
-          setIsAuthenticated(false);
-          setIsLoadingEmail(false);
-          router.replace("/login");
+        // No session - only redirect if this is initial check or explicit sign out
+        // Otherwise, let session timeout hook handle it
+        if (isInitialCheck) {
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            // Ignore sign out errors
+          }
+          if (mountedRef.current) {
+            setIsAuthenticated(false);
+            setIsLoadingEmail(false);
+            router.replace("/login");
+          }
+        } else {
+          // Periodic check found no session - just log, don't redirect
+          // The session timeout hook will handle logout if user is inactive
+          console.warn("No session found in periodic check");
+          if (mountedRef.current) {
+            setIsLoadingEmail(false);
+          }
         }
         return;
       }
@@ -95,15 +154,36 @@ export default function AdminLayout({
           .select("is_admin, email")
           .eq("id", session.user.id)
           .maybeSingle(),
-        "Admin profile check"
+        "Admin profile check",
+        15000 // Increased timeout
       );
       const prof = profileResp.data;
       const profError = profileResp.error;
 
       if (!mountedRef.current) return;
 
-      if (profError || !prof?.is_admin) {
-        // Not admin or error - redirect to login
+      if (profError) {
+        // Database error - log but don't redirect unless it's initial check
+        console.warn("Profile check error:", profError);
+        if (isInitialCheck) {
+          // On initial check, redirect if we can't verify admin status
+          await supabase.auth.signOut();
+          if (mountedRef.current) {
+            setIsAuthenticated(false);
+            setIsLoadingEmail(false);
+            router.replace("/login");
+          }
+        } else {
+          // Periodic check - just log, don't redirect
+          if (mountedRef.current) {
+            setIsLoadingEmail(false);
+          }
+        }
+        return;
+      }
+
+      if (!prof?.is_admin) {
+        // Not admin - always redirect
         await supabase.auth.signOut();
         if (mountedRef.current) {
           setIsAuthenticated(false);
@@ -113,43 +193,76 @@ export default function AdminLayout({
         return;
       }
 
-      // User is authenticated and is admin
+      // User is authenticated and is admin - success!
+      // Reset activity timer since we successfully verified session
       if (mountedRef.current) {
         setEmail(prof.email || "");
         setIsAuthenticated(true);
         setIsLoadingEmail(false);
+        // Reset session timeout activity timer on successful check
+        // This ensures that periodic checks don't cause premature timeouts
+        if (extendSessionRef.current) {
+          extendSessionRef.current();
+        }
       }
     } catch (err: unknown) {
-      console.error("Auth check error:", err);
-      // On error, redirect to login for security
-      if (mountedRef.current) {
-        setIsAuthenticated(false);
-        setIsLoadingEmail(false);
-        router.replace("/login");
+      const error = err as Error;
+      console.error("Auth check error:", error);
+      
+      // Only redirect on initial check or if it's a clear auth error
+      // Network/timeout errors should not cause redirects during periodic checks
+      const isAuthError = error.message?.includes("JWT") || 
+                         error.message?.includes("token") ||
+                         error.message?.includes("expired") ||
+                         error.message?.includes("invalid") ||
+                         error.message?.includes("Unauthorized");
+      
+      if (isInitialCheck || isAuthError) {
+        // Initial check failed or real auth error - redirect
+        if (mountedRef.current) {
+          setIsAuthenticated(false);
+          setIsLoadingEmail(false);
+          router.replace("/login");
+        }
+      } else {
+        // Periodic check failed due to network/timeout - just log, don't redirect
+        // The session timeout hook will handle logout if user is actually inactive
+        if (mountedRef.current) {
+          setIsLoadingEmail(false);
+        }
       }
     }
-  }, [router]);
+  }, [router, email]);
 
   useEffect(() => {
     mountedRef.current = true;
     let authCheckInterval: NodeJS.Timeout | null = null;
+    let lastVisibilityCheck = 0;
+    const VISIBILITY_CHECK_COOLDOWN = 30 * 1000; // Don't check more than once per 30 seconds
     
     const handleVisibility = () => {
       if (document.visibilityState === "visible" && mountedRef.current) {
-        fetchUser();
+        const now = Date.now();
+        // Only check if it's been at least 30 seconds since last check
+        // This prevents excessive checks when tabbing back and forth
+        if (now - lastVisibilityCheck > VISIBILITY_CHECK_COOLDOWN) {
+          lastVisibilityCheck = now;
+          fetchUser(false); // Not initial check
+        }
       }
     };
 
     // Initial check - fetch user data in background (non-blocking)
     // Use setTimeout to avoid calling setState synchronously within effect
     setTimeout(() => {
-      fetchUser();
+      fetchUser(true); // Initial check
     }, 0);
 
     // Set up session monitoring - check every 5 minutes for security
+    // These are periodic checks, not initial, so they won't redirect on transient errors
     authCheckInterval = setInterval(() => {
       if (mountedRef.current) {
-        fetchUser();
+        fetchUser(false); // Periodic check, not initial
       }
     }, 5 * 60 * 1000);
 
@@ -171,7 +284,11 @@ export default function AdminLayout({
 
         if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
           // Refresh user data when token is refreshed or user signs in
-          await fetchUser();
+          // Reset activity timer since token refresh means user is active
+          if (extendSessionRef.current) {
+            extendSessionRef.current();
+          }
+          await fetchUser(false); // Not initial check
         }
       }
     );
@@ -209,27 +326,6 @@ export default function AdminLayout({
     }
     router.replace("/login");
   };
-
-  // Session timeout handler
-  const handleSessionTimeout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      // Ignore sign out errors - we'll redirect anyway
-      console.error("Session timeout logout error:", error);
-    }
-    router.replace("/login");
-  };
-
-  // Use session timeout hook
-  const { showWarning, timeRemaining, extendSession } = useSessionTimeout(
-    handleSessionTimeout,
-    {
-      warningTime: 14 * 60 * 1000, // Show warning after 14 minutes of inactivity
-      timeoutTime: 15 * 60 * 1000, // Auto-logout after 15 minutes of inactivity
-      checkInterval: 60 * 1000, // Check every minute
-    }
-  );
 
   // If authentication status is unknown (null), show nothing while checking
   // If not authenticated (false), redirect will happen, show nothing

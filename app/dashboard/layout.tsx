@@ -64,8 +64,10 @@ export default function AdminLayout({
     }
   );
 
-  // Store extendSession in ref so fetchUser can use it
-  extendSessionRef.current = extendSession;
+  // Store extendSession in ref so fetchUser can use it (update in effect, not during render)
+  useEffect(() => {
+    extendSessionRef.current = extendSession;
+  }, [extendSession]);
 
   const fetchUser = useCallback(async (isInitialCheck = false) => {
     if (!mountedRef.current) return;

@@ -205,7 +205,7 @@ export default function LoginPage() {
             className={`w-full mt-4 py-3 font-bold rounded-xl shadow-md text-white transition-all duration-300 ${
               loading
                 ? "bg-[#6EC1E4]/70 cursor-not-allowed"
-                : "bg-[#6EC1E4] hover:bg-[#5bb7de]"
+                : "bg-[#6EC1E4] hover:bg-[#5bb7de] cursor-pointer"
             }`}
           >
             {loading ? "Signing in..." : "Log In"}

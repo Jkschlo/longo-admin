@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { authenticatedFetch } from "@/lib/api-client";
 import { Plus, Pencil, Trash2, Image as ImageIcon, X, ChevronDown, ChevronRight, FolderOpen, GripVertical, FileText } from "lucide-react";
@@ -56,6 +57,7 @@ interface ContentBlock {
    Component
 ------------------------------------------------------------------ */
 export default function ModulesPage() {
+  const router = useRouter();
   const [modules, setModules] = useState<Module[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -1271,7 +1273,7 @@ export default function ModulesPage() {
                         {sopUrl ? "Change SOP" : "Upload SOP"}
                       </button>
                       <button
-                        onClick={() => (window.location.href = `/dashboard/modules/${editModuleId}/quiz`)}
+                        onClick={() => router.push(`/dashboard/modules/${editModuleId}/quiz`)}
                         className="bg-[#E8F4FA] text-[#0A2C57] px-4 py-2 rounded-lg font-semibold hover:bg-[#d3edf9] cursor-pointer transition shadow-sm hover:shadow-md"
                       >
                         {hasQuiz ? "Edit Quiz" : "Create Quiz"}

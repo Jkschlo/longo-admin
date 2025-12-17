@@ -730,11 +730,8 @@ export default function ModulesPage() {
       const loadedBlocks = await loadBlocks(mod.id);
       setBlocks(loadedBlocks);
       
-      // Auto-expand all sections when opening
-      const sectionIndices = loadedBlocks
-        .map((b: ContentBlock, i: number) => (b.type === "section" ? i : -1))
-        .filter((i: number) => i !== -1);
-      setExpandedSections(new Set(sectionIndices));
+      // Keep all sections collapsed when opening
+      setExpandedSections(new Set());
       
       // Check if quiz exists
       const { data: quizData } = await supabase

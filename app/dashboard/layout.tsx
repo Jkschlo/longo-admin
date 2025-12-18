@@ -211,16 +211,58 @@ export default function AdminLayout({
       const error = err as Error;
       console.error("Auth check error:", error);
       
-      // Only redirect on initial check or if it's a clear auth error
-      // Network/timeout errors should not cause redirects during periodic checks
+      // Check if it's a clear auth error vs network/timeout error
       const isAuthError = error.message?.includes("JWT") || 
                          error.message?.includes("token") ||
                          error.message?.includes("expired") ||
                          error.message?.includes("invalid") ||
                          error.message?.includes("Unauthorized");
       
-      if (isInitialCheck || isAuthError) {
-        // Initial check failed or real auth error - redirect
+      const isTimeoutError = error.message?.includes("timed out");
+      
+      if (isAuthError) {
+        // Real auth error - session is invalid, redirect to login
+        if (mountedRef.current) {
+          setIsAuthenticated(false);
+          setIsLoadingEmail(false);
+          router.replace("/login");
+        }
+      } else if (isTimeoutError && isInitialCheck) {
+        // Timeout on initial check - retry once before giving up
+        console.warn("Initial auth check timed out, retrying...");
+        try {
+          const retryResp = await supabase.auth.getSession();
+          if (retryResp.data?.session?.user) {
+            // Session exists, verify admin status
+            const { data: prof } = await supabase
+              .from("profiles")
+              .select("is_admin, email")
+              .eq("id", retryResp.data.session.user.id)
+              .maybeSingle();
+            
+            if (prof?.is_admin && mountedRef.current) {
+              setEmail(prof.email || "");
+              setIsAuthenticated(true);
+              setIsLoadingEmail(false);
+              return;
+            }
+          }
+          // Retry failed or not admin - redirect
+          if (mountedRef.current) {
+            setIsAuthenticated(false);
+            setIsLoadingEmail(false);
+            router.replace("/login");
+          }
+        } catch {
+          // Retry also failed - redirect to login
+          if (mountedRef.current) {
+            setIsAuthenticated(false);
+            setIsLoadingEmail(false);
+            router.replace("/login");
+          }
+        }
+      } else if (isInitialCheck) {
+        // Other error on initial check - redirect to login
         if (mountedRef.current) {
           setIsAuthenticated(false);
           setIsLoadingEmail(false);
@@ -329,11 +371,8 @@ export default function AdminLayout({
     router.replace("/login");
   };
 
-  // If authentication status is unknown (null), show nothing while checking
   // If not authenticated (false), redirect will happen, show nothing
-  // Only show dashboard if authenticated (true)
-  if (isAuthenticated !== true) {
-    // Auth check in progress or user not authenticated - redirect will happen
+  if (isAuthenticated === false) {
     return null;
   }
 
@@ -405,7 +444,18 @@ export default function AdminLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      <main className="flex-1 overflow-y-auto p-8">
+        {isAuthenticated === null ? (
+          <div className="w-full flex items-center justify-center h-[70vh]">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#093075]"></div>
+              <p className="text-gray-500">Loading content...</p>
+            </div>
+          </div>
+        ) : (
+          children
+        )}
+      </main>
 
       {/* Session Timeout Modal */}
       <SessionTimeoutModal

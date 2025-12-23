@@ -68,6 +68,25 @@ function RichTextEditor({
   const [showToolbar, setShowToolbar] = useState(false);
   const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
   const editorRef = useRef<HTMLDivElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  const saveSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      savedRangeRef.current = selection.getRangeAt(0).cloneRange();
+    }
+  };
+
+  const restoreSelection = () => {
+    if (savedRangeRef.current && editorRef.current) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(savedRangeRef.current);
+      }
+    }
+  };
 
   const handleInput = () => {
     if (editorRef.current) {
@@ -75,35 +94,61 @@ function RichTextEditor({
     }
   };
 
-  const handleSelection = () => {
-    const selection = window.getSelection();
-    if (selection && selection.toString().length > 0 && editorRef.current?.contains(selection.anchorNode)) {
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const editorRect = editorRef.current.getBoundingClientRect();
-      
-      setToolbarPosition({
-        top: rect.top - editorRect.top - 40,
-        left: rect.left - editorRect.left + rect.width / 2 - 60,
-      });
-      setShowToolbar(true);
-    } else {
-      setShowToolbar(false);
+  const handleMouseUp = (e: React.MouseEvent) => {
+    // Don't show toolbar if clicking on the toolbar itself
+    if (toolbarRef.current?.contains(e.target as Node)) {
+      return;
     }
+
+    setTimeout(() => {
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        const anchorNode = selection.anchorNode;
+        if (editorRef.current?.contains(anchorNode)) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          const editorRect = editorRef.current.getBoundingClientRect();
+          
+          // Save the selection
+          saveSelection();
+          
+          setToolbarPosition({
+            top: rect.top - editorRect.top - 40,
+            left: rect.left - editorRect.left + rect.width / 2 - 60,
+          });
+          setShowToolbar(true);
+        } else {
+          setShowToolbar(false);
+        }
+      } else {
+        setShowToolbar(false);
+      }
+    }, 10);
   };
 
   const applyFormat = (command: string, value?: string) => {
+    restoreSelection();
     document.execCommand(command, false, value);
     editorRef.current?.focus();
     handleInput();
-    handleSelection();
+    setShowToolbar(false);
   };
 
-  const makeBold = () => {
-    applyFormat("bold");
+  const makeBold = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    restoreSelection();
+    document.execCommand("bold", false);
+    editorRef.current?.focus();
+    handleInput();
+    setShowToolbar(false);
   };
 
-  const makeLarger = () => {
+  const makeLarger = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    restoreSelection();
+    
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
@@ -113,27 +158,18 @@ function RichTextEditor({
       
       try {
         range.surroundContents(span);
-        onChange(editorRef.current?.innerHTML || "");
-        editorRef.current?.focus();
-        handleSelection();
-      } catch (e) {
+      } catch (err) {
         // If surroundContents fails, try alternative approach
         const contents = range.extractContents();
         span.appendChild(contents);
         range.insertNode(span);
-        onChange(editorRef.current?.innerHTML || "");
-        editorRef.current?.focus();
-        handleSelection();
       }
+      
+      onChange(editorRef.current?.innerHTML || "");
+      editorRef.current?.focus();
+      setShowToolbar(false);
     }
   };
-
-  useEffect(() => {
-    document.addEventListener("selectionchange", handleSelection);
-    return () => {
-      document.removeEventListener("selectionchange", handleSelection);
-    };
-  }, []);
 
   return (
     <div className="relative">
@@ -141,9 +177,18 @@ function RichTextEditor({
         ref={editorRef}
         contentEditable
         onInput={handleInput}
-        onBlur={() => {
-          // Keep toolbar visible briefly on blur
-          setTimeout(() => setShowToolbar(false), 200);
+        onMouseUp={handleMouseUp}
+        onBlur={(e) => {
+          // Don't hide toolbar if clicking on toolbar
+          if (toolbarRef.current?.contains(e.relatedTarget as Node)) {
+            return;
+          }
+          // Delay hiding to allow button clicks
+          setTimeout(() => {
+            if (document.activeElement !== editorRef.current) {
+              setShowToolbar(false);
+            }
+          }, 200);
         }}
         dangerouslySetInnerHTML={{ __html: value || "" }}
         className="border-2 border-gray-300 bg-white rounded-lg p-3 min-h-[100px] text-sm w-full focus:ring-2 focus:ring-[#6EC1E4] focus:border-[#6EC1E4] transition resize-none outline-none"
@@ -154,6 +199,10 @@ function RichTextEditor({
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             document.execCommand("insertLineBreak");
+          }
+          // Hide toolbar on arrow keys or escape
+          if (e.key === "Escape" || e.key.startsWith("Arrow")) {
+            setShowToolbar(false);
           }
         }}
       />
@@ -167,16 +216,22 @@ function RichTextEditor({
       
       {showToolbar && (
         <div
+          ref={toolbarRef}
           className="absolute z-10 bg-white border-2 border-[#6EC1E4] rounded-lg shadow-lg p-1 flex gap-1"
           style={{
             top: `${toolbarPosition.top}px`,
             left: `${toolbarPosition.left}px`,
             transform: "translateX(-50%)",
           }}
+          onMouseDown={(e) => {
+            // Prevent editor from losing focus when clicking toolbar
+            e.preventDefault();
+          }}
         >
           <button
             type="button"
             onClick={makeBold}
+            onMouseDown={(e) => e.preventDefault()}
             className="p-2 hover:bg-[#E8F4FA] rounded transition cursor-pointer"
             title="Bold"
           >
@@ -185,6 +240,7 @@ function RichTextEditor({
           <button
             type="button"
             onClick={makeLarger}
+            onMouseDown={(e) => e.preventDefault()}
             className="p-2 hover:bg-[#E8F4FA] rounded transition cursor-pointer"
             title="Bold & Larger"
           >

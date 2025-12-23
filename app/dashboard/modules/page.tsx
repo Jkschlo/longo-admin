@@ -2,11 +2,11 @@
 /* eslint-disable jsx-a11y/alt-text */
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { authenticatedFetch } from "@/lib/api-client";
-import { Plus, Pencil, Trash2, Image as ImageIcon, X, ChevronDown, ChevronRight, FolderOpen, GripVertical, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, Image as ImageIcon, X, ChevronDown, ChevronRight, FolderOpen, GripVertical, FileText, Bold, Type } from "lucide-react";
 import { Switch } from "@headlessui/react";
 import Cropper, { Area } from "react-easy-crop";
 import { motion, AnimatePresence } from "framer-motion";
@@ -51,6 +51,149 @@ interface ContentBlock {
   content: string;
   caption?: string | null;
   order_index: number;
+}
+
+/* ------------------------------------------------------------------
+   Rich Text Editor Component
+------------------------------------------------------------------ */
+function RichTextEditor({
+  value,
+  onChange,
+  placeholder = "Enter text content...",
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  placeholder?: string;
+}) {
+  const [showToolbar, setShowToolbar] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+  };
+
+  const handleSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0 && editorRef.current?.contains(selection.anchorNode)) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const editorRect = editorRef.current.getBoundingClientRect();
+      
+      setToolbarPosition({
+        top: rect.top - editorRect.top - 40,
+        left: rect.left - editorRect.left + rect.width / 2 - 60,
+      });
+      setShowToolbar(true);
+    } else {
+      setShowToolbar(false);
+    }
+  };
+
+  const applyFormat = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+    editorRef.current?.focus();
+    handleInput();
+    handleSelection();
+  };
+
+  const makeBold = () => {
+    applyFormat("bold");
+  };
+
+  const makeLarger = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement("span");
+      span.style.fontSize = "1.25em";
+      span.style.fontWeight = "bold";
+      
+      try {
+        range.surroundContents(span);
+        onChange(editorRef.current?.innerHTML || "");
+        editorRef.current?.focus();
+        handleSelection();
+      } catch (e) {
+        // If surroundContents fails, try alternative approach
+        const contents = range.extractContents();
+        span.appendChild(contents);
+        range.insertNode(span);
+        onChange(editorRef.current?.innerHTML || "");
+        editorRef.current?.focus();
+        handleSelection();
+      }
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener("selectionchange", handleSelection);
+    return () => {
+      document.removeEventListener("selectionchange", handleSelection);
+    };
+  }, []);
+
+  return (
+    <div className="relative">
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        onBlur={() => {
+          // Keep toolbar visible briefly on blur
+          setTimeout(() => setShowToolbar(false), 200);
+        }}
+        dangerouslySetInnerHTML={{ __html: value || "" }}
+        className="border-2 border-gray-300 bg-white rounded-lg p-3 min-h-[100px] text-sm w-full focus:ring-2 focus:ring-[#6EC1E4] focus:border-[#6EC1E4] transition resize-none outline-none"
+        style={{ whiteSpace: "pre-wrap" }}
+        data-placeholder={placeholder}
+        onKeyDown={(e) => {
+          // Allow Enter for new lines
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            document.execCommand("insertLineBreak");
+          }
+        }}
+      />
+      <style jsx>{`
+        [contenteditable][data-placeholder]:empty:before {
+          content: attr(data-placeholder);
+          color: #9ca3af;
+          pointer-events: none;
+        }
+      `}</style>
+      
+      {showToolbar && (
+        <div
+          className="absolute z-10 bg-white border-2 border-[#6EC1E4] rounded-lg shadow-lg p-1 flex gap-1"
+          style={{
+            top: `${toolbarPosition.top}px`,
+            left: `${toolbarPosition.left}px`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={makeBold}
+            className="p-2 hover:bg-[#E8F4FA] rounded transition cursor-pointer"
+            title="Bold"
+          >
+            <Bold size={16} className="text-[#0A2C57]" />
+          </button>
+          <button
+            type="button"
+            onClick={makeLarger}
+            className="p-2 hover:bg-[#E8F4FA] rounded transition cursor-pointer"
+            title="Bold & Larger"
+          >
+            <Type size={16} className="text-[#0A2C57]" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------
@@ -1653,11 +1796,10 @@ export default function ModulesPage() {
 
                                                           <div className="ml-8">
                                                             {block.type === "text" && (
-                                                              <textarea
+                                                              <RichTextEditor
                                                                 value={block.content || ""}
-                                                                onChange={(e) => updateBlockField(block.id, "content", e.target.value)}
+                                                                onChange={(html) => updateBlockField(block.id, "content", html)}
                                                                 placeholder="Enter text content..."
-                                                                className="border-2 border-gray-300 bg-white rounded-lg p-3 min-h-[100px] text-sm w-full focus:ring-2 focus:ring-[#6EC1E4] focus:border-[#6EC1E4] transition resize-none"
                                                               />
                                                             )}
                                                             {block.type === "image" && (

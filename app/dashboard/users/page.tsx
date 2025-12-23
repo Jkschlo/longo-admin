@@ -121,11 +121,6 @@ function ManageRolesModal({
   }
 
   async function deleteRole(id: string) {
-    if (id === NEW_HIRE_ROLE) {
-      alert("New Hire cannot be deleted.");
-      return;
-    }
-
     const role = roles.find((r) => r.id === id);
     if (role) {
       setDeleteRoleConfirm({ id: role.id, name: role.name });
@@ -143,109 +138,197 @@ function ManageRolesModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-xl p-6 w-[460px] max-h-[80vh] overflow-y-auto relative"
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col relative"
       >
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 p-1 rounded hover:bg-gray-200"
-        >
-          <X size={20} />
-        </button>
-
-        <h2 className="text-2xl font-bold text-[#093075] mb-4">Role Manager</h2>
-
-        <div className="flex gap-2 mb-6">
-          <input
-            value={roleName}
-            onChange={(e) => setRoleName(e.target.value)}
-            placeholder="New role name…"
-            className="border px-3 py-2 rounded w-full"
-          />
-
+        {/* Header */}
+        <div className="bg-gradient-to-r from-[#0A2C57] to-[#093075] px-6 py-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Role Manager</h2>
+            <p className="text-white/80 text-sm mt-1">
+              Create, edit, and manage user roles
+            </p>
+          </div>
           <button
-            onClick={() => (editingId ? saveEdit(editingId) : createRole())}
-            className="bg-[#093075] text-white px-4 py-2 rounded hover:bg-[#0a3c9c] cursor-pointer"
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-white/20 transition cursor-pointer"
           >
-            {editingId ? "Save" : <Plus size={20} />}
+            <X size={20} className="text-white" />
           </button>
         </div>
 
-        <div className="space-y-3">
-          {roles.map((role) => (
-            <div
-              key={role.id}
-              className="border p-3 rounded-lg flex justify-between items-center"
-            >
-              <div className="font-semibold">{role.name}</div>
-
-              <div className="flex gap-3">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Create/Edit Role Section */}
+          <div className="bg-[#E8F4FA] rounded-lg p-4 border border-[#6EC1E4]/30">
+            <h3 className="text-sm font-semibold text-[#0A2C57] mb-3">
+              {editingId ? "Edit Role" : "Create New Role"}
+            </h3>
+            <div className="flex gap-3">
+              <input
+                value={roleName}
+                onChange={(e) => setRoleName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    editingId ? saveEdit(editingId) : createRole();
+                  }
+                }}
+                placeholder="Enter role name..."
+                className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6EC1E4] focus:border-[#6EC1E4] transition"
+              />
+              <button
+                onClick={() => (editingId ? saveEdit(editingId) : createRole())}
+                disabled={!roleName.trim()}
+                className={`px-5 py-2.5 rounded-lg font-semibold transition shadow-sm hover:shadow-md cursor-pointer flex items-center gap-2 ${
+                  roleName.trim()
+                    ? "bg-[#0A2C57] hover:bg-[#093075] text-white"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                {editingId ? (
+                  <>
+                    <Edit3 size={18} /> Save Changes
+                  </>
+                ) : (
+                  <>
+                    <Plus size={18} /> Create Role
+                  </>
+                )}
+              </button>
+              {editingId && (
                 <button
                   onClick={() => {
-                    setEditingId(role.id);
-                    setRoleName(role.name);
+                    setEditingId(null);
+                    setRoleName("");
                   }}
-                  className="p-1 rounded hover:bg-gray-200 cursor-pointer"
+                  className="px-4 py-2.5 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition cursor-pointer"
                 >
-                  <Edit3 size={18} />
+                  Cancel
                 </button>
-
-                {role.id !== NEW_HIRE_ROLE && (
-                  <button
-                    onClick={() => deleteRole(role.id)}
-                    className="p-1 rounded text-red-600 hover:bg-red-100 cursor-pointer"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-          ))}
+          </div>
+
+          {/* Roles List */}
+          <div>
+            <h3 className="text-sm font-semibold text-[#0A2C57] mb-3">
+              Existing Roles ({roles.length})
+            </h3>
+            <div className="space-y-2">
+              {roles.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                  <Users size={32} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-gray-500 text-sm">No roles created yet</p>
+                </div>
+              ) : (
+                roles.map((role) => (
+                  <div
+                    key={role.id}
+                    className="bg-white border-2 border-gray-200 rounded-lg p-4 flex items-center justify-between hover:border-[#6EC1E4] transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8F4FA] flex items-center justify-center">
+                        <Users size={18} className="text-[#0A2C57]" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-[#0A2C57]">
+                          {role.name}
+                        </div>
+                        {role.id === NEW_HIRE_ROLE && (
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            Default role for new users
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingId(role.id);
+                          setRoleName(role.name);
+                        }}
+                        className="p-2 rounded-lg hover:bg-[#E8F4FA] text-[#0A2C57] transition cursor-pointer"
+                        title="Edit role"
+                      >
+                        <Edit3 size={18} />
+                      </button>
+                      <button
+                        onClick={() => deleteRole(role.id)}
+                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition cursor-pointer"
+                        title="Delete role"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </motion.div>
 
       {/* Delete Role Confirmation Modal */}
       {deleteRoleConfirm.id && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000] p-4">
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative"
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md relative overflow-hidden"
           >
-            {/* Warning Icon */}
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <Trash2 size={32} className="text-red-600" />
+            {/* Header with warning color */}
+            <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-5">
+              <div className="flex items-center justify-center mb-3">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                  <Trash2 size={32} className="text-white" />
+                </div>
               </div>
+              <h2 className="text-2xl font-bold text-white text-center">
+                Delete Role?
+              </h2>
             </div>
 
-            {/* Title */}
-            <h2 className="text-2xl font-bold text-[#0A2C57] text-center mb-2">
-              Delete Role?
-            </h2>
+            {/* Content */}
+            <div className="p-6">
+              {/* Warning Message */}
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  You are about to permanently delete the role{" "}
+                  <span className="font-bold text-red-600">
+                    {deleteRoleConfirm.name}
+                  </span>
+                  . This action cannot be undone.
+                </p>
+                {deleteRoleConfirm.id === NEW_HIRE_ROLE && (
+                  <p className="text-red-600 text-sm font-semibold mt-2">
+                    ⚠️ Warning: This is the default role. Deleting it may affect
+                    new user assignments.
+                  </p>
+                )}
+              </div>
 
-            {/* Warning Message */}
-            <p className="text-gray-600 text-center mb-4">
-              This will permanently delete the role <span className="font-bold">{deleteRoleConfirm.name}</span>. This action cannot be undone.
-            </p>
-
-            {/* Buttons */}
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setDeleteRoleConfirm({ id: null, name: "" })}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRoleDelete}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition cursor-pointer"
-              >
-                Delete
-              </button>
+              {/* Buttons */}
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setDeleteRoleConfirm({ id: null, name: "" })}
+                  className="px-5 py-2.5 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRoleDelete}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition shadow-sm hover:shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  <Trash2 size={16} />
+                  Delete Role
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>

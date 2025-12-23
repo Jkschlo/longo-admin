@@ -85,6 +85,8 @@ function ManageRolesModal({
 }) {
   const [roleName, setRoleName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>("");
+  const editInputRef = useRef<HTMLInputElement>(null);
   const [deleteRoleConfirm, setDeleteRoleConfirm] = useState<{
     id: string | null;
     name: string;
@@ -104,10 +106,13 @@ function ManageRolesModal({
     await refreshRoles();
   }
 
-  async function saveEdit(id: string) {
+  async function saveEdit(id: string, nameToSave?: string) {
+    const name = nameToSave !== undefined ? nameToSave : roleName;
+    if (!name.trim()) return;
+
     const { error } = await supabase
       .from("roles")
-      .update({ name: roleName })
+      .update({ name: name.trim() })
       .eq("id", id);
 
     if (error) {
@@ -117,8 +122,18 @@ function ManageRolesModal({
 
     setRoleName("");
     setEditingId(null);
+    setEditingName("");
     await refreshRoles();
   }
+
+  // Focus input and set cursor to end when editing starts
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+      const length = editInputRef.current.value.length;
+      editInputRef.current.setSelectionRange(length, length);
+    }
+  }, [editingId]);
 
   async function deleteRole(id: string) {
     const role = roles.find((r) => r.id === id);
@@ -230,41 +245,90 @@ function ManageRolesModal({
                     key={role.id}
                     className="bg-white border-2 border-gray-200 rounded-lg p-4 flex items-center justify-between hover:border-[#6EC1E4] transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-[#E8F4FA] flex items-center justify-center">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8F4FA] flex items-center justify-center flex-shrink-0">
                         <Users size={18} className="text-[#0A2C57]" />
                       </div>
-                      <div>
-                        <div className="font-semibold text-[#0A2C57]">
-                          {role.name}
-                        </div>
-                        {role.id === NEW_HIRE_ROLE && (
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            Default role for new users
+                      <div className="flex-1 min-w-0">
+                        {editingId === role.id ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              ref={editInputRef}
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  saveEdit(role.id, editingName);
+                                } else if (e.key === "Escape") {
+                                  setEditingId(null);
+                                  setEditingName("");
+                                }
+                              }}
+                              onBlur={() => {
+                                // Don't auto-save on blur, let user click save
+                              }}
+                              className="flex-1 px-3 py-1.5 border-2 border-[#6EC1E4] rounded-lg focus:ring-2 focus:ring-[#6EC1E4] focus:outline-none font-semibold text-[#0A2C57]"
+                            />
+                            <button
+                              onClick={() => saveEdit(role.id, editingName)}
+                              disabled={!editingName.trim()}
+                              className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+                                editingName.trim()
+                                  ? "bg-[#0A2C57] hover:bg-[#093075] text-white"
+                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              }`}
+                              title="Save changes"
+                            >
+                              <CheckCircle2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingId(null);
+                                setEditingName("");
+                              }}
+                              className="px-3 py-1.5 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                              title="Cancel"
+                            >
+                              <X size={16} />
+                            </button>
                           </div>
+                        ) : (
+                          <>
+                            <div className="font-semibold text-[#0A2C57]">
+                              {role.name}
+                            </div>
+                            {role.id === NEW_HIRE_ROLE && (
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                Default role for new users
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingId(role.id);
-                          setRoleName(role.name);
-                        }}
-                        className="p-2 rounded-lg hover:bg-[#E8F4FA] text-[#0A2C57] transition cursor-pointer"
-                        title="Edit role"
-                      >
-                        <Edit3 size={18} />
-                      </button>
-                      <button
-                        onClick={() => deleteRole(role.id)}
-                        className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition cursor-pointer"
-                        title="Delete role"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+                    {editingId !== role.id && (
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => {
+                            setEditingId(role.id);
+                            setEditingName(role.name);
+                          }}
+                          className="p-2 rounded-lg hover:bg-[#E8F4FA] text-[#0A2C57] transition cursor-pointer"
+                          title="Edit role"
+                        >
+                          <Edit3 size={18} />
+                        </button>
+                        <button
+                          onClick={() => deleteRole(role.id)}
+                          className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition cursor-pointer"
+                          title="Delete role"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

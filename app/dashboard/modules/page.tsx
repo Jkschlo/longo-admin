@@ -74,18 +74,29 @@ function RichTextEditor({
   const saveSelection = () => {
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
-      savedRangeRef.current = selection.getRangeAt(0).cloneRange();
+      const range = selection.getRangeAt(0);
+      if (editorRef.current?.contains(range.commonAncestorContainer)) {
+        savedRangeRef.current = range.cloneRange();
+      }
     }
   };
 
   const restoreSelection = () => {
     if (savedRangeRef.current && editorRef.current) {
+      editorRef.current.focus();
       const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(savedRangeRef.current);
+      if (selection && savedRangeRef.current) {
+        try {
+          selection.removeAllRanges();
+          selection.addRange(savedRangeRef.current);
+          return true;
+        } catch (e) {
+          // Range might be invalid, try to recreate it
+          return false;
+        }
       }
     }
+    return false;
   };
 
   const handleInput = () => {
@@ -137,38 +148,130 @@ function RichTextEditor({
   const makeBold = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    restoreSelection();
-    document.execCommand("bold", false);
-    editorRef.current?.focus();
-    handleInput();
-    setShowToolbar(false);
+    
+    // Save current selection before any focus changes
+    const currentSelection = window.getSelection();
+    if (currentSelection && currentSelection.rangeCount > 0) {
+      savedRangeRef.current = currentSelection.getRangeAt(0).cloneRange();
+    }
+    
+    // Ensure editor has focus first
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    
+    // Apply formatting immediately
+    requestAnimationFrame(() => {
+      if (restoreSelection()) {
+        const success = document.execCommand("bold", false);
+        if (!success) {
+          // Fallback: manually wrap in <strong>
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            if (!range.collapsed) {
+              const strong = document.createElement("strong");
+              try {
+                range.surroundContents(strong);
+              } catch (err) {
+                const contents = range.extractContents();
+                strong.appendChild(contents);
+                range.insertNode(strong);
+              }
+            }
+          }
+        }
+      } else {
+        // Try with current selection
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          document.execCommand("bold", false);
+        }
+      }
+      handleInput();
+      setShowToolbar(false);
+    });
   };
 
   const makeLarger = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    restoreSelection();
     
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const span = document.createElement("span");
-      span.style.fontSize = "1.25em";
-      span.style.fontWeight = "bold";
+    // Save current selection before any focus changes
+    const currentSelection = window.getSelection();
+    if (currentSelection && currentSelection.rangeCount > 0) {
+      savedRangeRef.current = currentSelection.getRangeAt(0).cloneRange();
+    }
+    
+    // Ensure editor has focus first
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    
+    // Apply formatting immediately
+    requestAnimationFrame(() => {
+      let range: Range | null = null;
       
-      try {
-        range.surroundContents(span);
-      } catch (err) {
-        // If surroundContents fails, try alternative approach
-        const contents = range.extractContents();
-        span.appendChild(contents);
-        range.insertNode(span);
+      if (restoreSelection()) {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          range = selection.getRangeAt(0);
+        }
+      } else {
+        // Fallback: try to get current selection
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          range = selection.getRangeAt(0);
+        }
       }
       
-      onChange(editorRef.current?.innerHTML || "");
-      editorRef.current?.focus();
+      if (range && !range.collapsed) {
+        const span = document.createElement("span");
+        span.style.fontSize = "1.25em";
+        span.style.fontWeight = "bold";
+        
+        try {
+          range.surroundContents(span);
+        } catch (err) {
+          // If surroundContents fails, try alternative approach
+          try {
+            const contents = range.extractContents();
+            span.appendChild(contents);
+            range.insertNode(span);
+          } catch (err2) {
+            // Last resort: wrap each text node
+            const walker = document.createTreeWalker(
+              range.commonAncestorContainer,
+              NodeFilter.SHOW_TEXT,
+              {
+                acceptNode: (node) => {
+                  return range!.intersectsNode(node) 
+                    ? NodeFilter.FILTER_ACCEPT 
+                    : NodeFilter.FILTER_REJECT;
+                }
+              }
+            );
+            
+            const textNodes: Text[] = [];
+            let node;
+            while (node = walker.nextNode()) {
+              textNodes.push(node as Text);
+            }
+            
+            textNodes.forEach(textNode => {
+              const wrapper = document.createElement("span");
+              wrapper.style.fontSize = "1.25em";
+              wrapper.style.fontWeight = "bold";
+              textNode.parentNode?.replaceChild(wrapper, textNode);
+              wrapper.appendChild(textNode);
+            });
+          }
+        }
+        
+        handleInput();
+      }
       setShowToolbar(false);
-    }
+    });
   };
 
   return (
@@ -223,15 +326,18 @@ function RichTextEditor({
             left: `${toolbarPosition.left}px`,
             transform: "translateX(-50%)",
           }}
-          onMouseDown={(e) => {
-            // Prevent editor from losing focus when clicking toolbar
-            e.preventDefault();
-          }}
         >
           <button
             type="button"
-            onClick={makeBold}
-            onMouseDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              // Save selection before click causes it to be lost
+              const selection = window.getSelection();
+              if (selection && selection.rangeCount > 0) {
+                savedRangeRef.current = selection.getRangeAt(0).cloneRange();
+              }
+              makeBold(e);
+            }}
             className="p-2 hover:bg-[#E8F4FA] rounded transition cursor-pointer"
             title="Bold"
           >
@@ -239,8 +345,15 @@ function RichTextEditor({
           </button>
           <button
             type="button"
-            onClick={makeLarger}
-            onMouseDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              // Save selection before click causes it to be lost
+              const selection = window.getSelection();
+              if (selection && selection.rangeCount > 0) {
+                savedRangeRef.current = selection.getRangeAt(0).cloneRange();
+              }
+              makeLarger(e);
+            }}
             className="p-2 hover:bg-[#E8F4FA] rounded transition cursor-pointer"
             title="Bold & Larger"
           >

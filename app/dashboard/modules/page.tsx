@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { authenticatedFetch } from "@/lib/api-client";
-import { Plus, Pencil, Trash2, Image as ImageIcon, X, ChevronDown, ChevronRight, FolderOpen, GripVertical, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, Image as ImageIcon, X, ChevronDown, ChevronUp, ChevronRight, FolderOpen, GripVertical, FileText } from "lucide-react";
 import { Switch } from "@headlessui/react";
 import Cropper, { Area } from "react-easy-crop";
 import { motion, AnimatePresence } from "framer-motion";
@@ -365,6 +365,91 @@ export default function ModulesPage() {
     // Only update database if block has a real ID (not temp)
     if (blockId && !blockId.startsWith("temp-") && editModuleId) {
       await supabase.from("module_content").update({ [field]: value }).eq("id", blockId);
+      await syncModuleJSON(editModuleId, updated);
+    }
+  };
+
+  const moveBlockUp = async (blockId: string | undefined) => {
+    if (!blockId) return;
+    
+    // Find the block and its section
+    const blockIndex = blocks.findIndex((b) => b.id === blockId);
+    if (blockIndex <= 0) return; // Can't move up if it's the first block
+    
+    const block = blocks[blockIndex];
+    if (block.type === "section") return; // Don't move sections with this function
+    
+    // Find the section this block belongs to
+    let sectionStartIndex = blockIndex;
+    while (sectionStartIndex > 0 && blocks[sectionStartIndex - 1].type !== "section") {
+      sectionStartIndex--;
+    }
+    
+    // Check if this is the first content block in the section
+    if (blockIndex === sectionStartIndex + 1) return; // Already at the top of section
+    
+    // Swap with the block above
+    const reordered = Array.from(blocks);
+    [reordered[blockIndex - 1], reordered[blockIndex]] = [reordered[blockIndex], reordered[blockIndex - 1]];
+    
+    // Update order indices
+    const updated = reordered.map((b, i) => ({ ...b, order_index: i }));
+    setBlocks(updated);
+
+    if (editModuleId) {
+      const realBlocks = updated.filter((b) => b.id && !b.id.startsWith("temp-"));
+      if (realBlocks.length > 0) {
+        await supabase
+          .from("module_content")
+          .upsert(realBlocks.map((b) => ({ id: b.id, order_index: b.order_index })));
+      }
+      await syncModuleJSON(editModuleId, updated);
+    }
+  };
+
+  const moveBlockDown = async (blockId: string | undefined) => {
+    if (!blockId) return;
+    
+    // Find the block and its section
+    const blockIndex = blocks.findIndex((b) => b.id === blockId);
+    if (blockIndex < 0 || blockIndex >= blocks.length - 1) return; // Can't move down if it's the last block
+    
+    const block = blocks[blockIndex];
+    if (block.type === "section") return; // Don't move sections with this function
+    
+    // Find the section this block belongs to
+    let sectionStartIndex = blockIndex;
+    while (sectionStartIndex > 0 && blocks[sectionStartIndex - 1].type !== "section") {
+      sectionStartIndex--;
+    }
+    
+    // Find the end of this section (next section or end of array)
+    let sectionEndIndex = blocks.length;
+    for (let i = sectionStartIndex + 1; i < blocks.length; i++) {
+      if (blocks[i].type === "section") {
+        sectionEndIndex = i;
+        break;
+      }
+    }
+    
+    // Check if this is the last content block in the section
+    if (blockIndex === sectionEndIndex - 1) return; // Already at the bottom of section
+    
+    // Swap with the block below
+    const reordered = Array.from(blocks);
+    [reordered[blockIndex], reordered[blockIndex + 1]] = [reordered[blockIndex + 1], reordered[blockIndex]];
+    
+    // Update order indices
+    const updated = reordered.map((b, i) => ({ ...b, order_index: i }));
+    setBlocks(updated);
+
+    if (editModuleId) {
+      const realBlocks = updated.filter((b) => b.id && !b.id.startsWith("temp-"));
+      if (realBlocks.length > 0) {
+        await supabase
+          .from("module_content")
+          .upsert(realBlocks.map((b) => ({ id: b.id, order_index: b.order_index })));
+      }
       await syncModuleJSON(editModuleId, updated);
     }
   };
@@ -1566,58 +1651,6 @@ export default function ModulesPage() {
                                 }
                                 await syncModuleJSON(editModuleId, updated);
                               }
-                            } 
-                            // Check if dragging a content block within a section
-                            else if (sourceDroppableId.startsWith("section-") && destDroppableId.startsWith("section-")) {
-                              // Only allow dragging within the same section
-                              if (sourceDroppableId !== destDroppableId) {
-                                return; // Prevent cross-section dragging
-                              }
-                              
-                              const sectionId = sourceDroppableId.replace("section-", "");
-                              const section = sections.find((s) => s.section.id === sectionId);
-                              if (!section) return;
-                              
-                              // Get the section's blocks in order
-                              const sectionStartIndex = blocks.findIndex((b) => b.id === section.section.id);
-                              let sectionEndIndex = blocks.length;
-                              
-                              // Find the next section after this one
-                              for (let i = sectionStartIndex + 1; i < blocks.length; i++) {
-                                if (blocks[i].type === "section") {
-                                  sectionEndIndex = i;
-                                  break;
-                                }
-                              }
-                              
-                              // Get only content blocks (excluding the section header)
-                              const contentBlocks = blocks.slice(sectionStartIndex + 1, sectionEndIndex);
-                              
-                              // Reorder within the section
-                              const reorderedContent = Array.from(contentBlocks);
-                              const [removed] = reorderedContent.splice(sourceIndex, 1);
-                              reorderedContent.splice(destIndex, 0, removed);
-                              
-                              // Rebuild the full blocks array
-                              const reordered = [
-                                ...blocks.slice(0, sectionStartIndex + 1),
-                                ...reorderedContent,
-                                ...blocks.slice(sectionEndIndex)
-                              ];
-                              
-                              // Update order indices
-                              const updated = reordered.map((b, i) => ({ ...b, order_index: i }));
-                              setBlocks(updated);
-
-                              if (editModuleId) {
-                                const realBlocks = updated.filter((b) => b.id && !b.id.startsWith("temp-"));
-                                if (realBlocks.length > 0) {
-                                  await supabase
-                                    .from("module_content")
-                                    .upsert(realBlocks.map((b) => ({ id: b.id, order_index: b.order_index })));
-                                }
-                                await syncModuleJSON(editModuleId, updated);
-                              }
                             }
                           }}
                         >
@@ -1707,46 +1740,55 @@ export default function ModulesPage() {
                                             transition={{ duration: 0.2 }}
                                             className="overflow-hidden"
                                           >
-                                            <Droppable droppableId={`section-${section.id || sectionIndex}`}>
-                                              {(provided) => (
-                                                <div 
-                                                  {...provided.droppableProps} 
-                                                  ref={provided.innerRef}
-                                                  className="p-4 space-y-3 bg-gray-50"
-                                                >
-                                                  {sectionBlocks.length === 0 ? (
-                                                    <p className="text-sm text-gray-400 text-center py-4">
-                                                      No content in this section. Add content below.
-                                                    </p>
-                                                  ) : (
-                                                    sectionBlocks.map((block, blockIndex) => {
-                                                      // Calculate global index for this block (for IDs)
-                                                      const sectionStartIndex = blocks.findIndex((b) => b.id === section.id);
-                                                      const globalIndex = sectionStartIndex >= 0 ? sectionStartIndex + 1 + blockIndex : blockIndex;
-                                                      
-                                                      return (
-                                                        <Draggable
-                                                          key={block.id || `block-${blockIndex}`}
-                                                          draggableId={block.id || `block-${blockIndex}`}
-                                                          index={blockIndex}
-                                                        >
-                                                      {(provided, snapshot) => (
-                                                        <div
-                                                          ref={provided.innerRef}
-                                                          {...provided.draggableProps}
-                                                          className={`relative border-2 border-gray-200 bg-white rounded-lg p-5 transition-all group ${
-                                                            snapshot.isDragging
-                                                              ? "shadow-xl bg-[#E8F4FA] border-[#6EC1E4] scale-105"
-                                                              : "hover:border-[#6EC1E4] hover:shadow-md"
+                                            <div className="p-4 space-y-3 bg-gray-50">
+                                              {sectionBlocks.length === 0 ? (
+                                                <p className="text-sm text-gray-400 text-center py-4">
+                                                  No content in this section. Add content below.
+                                                </p>
+                                              ) : (
+                                                sectionBlocks.map((block, blockIndex) => {
+                                                  // Calculate global index for this block (for IDs)
+                                                  const sectionStartIndex = blocks.findIndex((b) => b.id === section.id);
+                                                  const globalIndex = sectionStartIndex >= 0 ? sectionStartIndex + 1 + blockIndex : blockIndex;
+                                                  
+                                                  // Check if this is the first or last block in the section
+                                                  const isFirstBlock = blockIndex === 0;
+                                                  const isLastBlock = blockIndex === sectionBlocks.length - 1;
+                                                  
+                                                  return (
+                                                    <div
+                                                      key={block.id || `block-${blockIndex}`}
+                                                      className="relative border-2 border-gray-200 bg-white rounded-lg p-5 transition-all group hover:border-[#6EC1E4] hover:shadow-md"
+                                                    >
+                                                      {/* Up/Down Arrow Buttons */}
+                                                      <div className="absolute left-2 top-1/2 transform -translate-y-1/2 flex flex-col gap-1">
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => moveBlockUp(block.id)}
+                                                          disabled={isFirstBlock}
+                                                          className={`p-1 rounded transition ${
+                                                            isFirstBlock
+                                                              ? "text-gray-300 cursor-not-allowed"
+                                                              : "text-gray-600 hover:text-[#6EC1E4] hover:bg-[#E8F4FA] cursor-pointer"
                                                           }`}
+                                                          title="Move up"
                                                         >
-                                                          {/* Drag Handle */}
-                                                          <div
-                                                            {...provided.dragHandleProps}
-                                                            className="absolute left-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
-                                                          >
-                                                            <GripVertical size={20} className="text-gray-400 hover:text-[#6EC1E4]" />
-                                                          </div>
+                                                          <ChevronUp size={18} />
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => moveBlockDown(block.id)}
+                                                          disabled={isLastBlock}
+                                                          className={`p-1 rounded transition ${
+                                                            isLastBlock
+                                                              ? "text-gray-300 cursor-not-allowed"
+                                                              : "text-gray-600 hover:text-[#6EC1E4] hover:bg-[#E8F4FA] cursor-pointer"
+                                                          }`}
+                                                          title="Move down"
+                                                        >
+                                                          <ChevronDown size={18} />
+                                                        </button>
+                                                      </div>
 
                                                           {/* Delete Button */}
                                                           <div className="absolute right-3 top-3">
@@ -1890,7 +1932,7 @@ export default function ModulesPage() {
                                                                       type="button"
                                                                       onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        const inputId = `content-pdf-${block.id || globalIndex}`;
+                                                                        const inputId = `content-pdf-${block.id || `block-${blockIndex}`}`;
                                                                         const input = document.getElementById(inputId) as HTMLInputElement;
                                                                         if (input) {
                                                                           input.value = "";
@@ -1954,16 +1996,13 @@ export default function ModulesPage() {
                                                               </div>
                                                             )}
                                                           </div>
-                                                        </div>
-                                                      )}
-                                                    </Draggable>
-                                                      );
-                                                    })
-                                                  )}
-                                                  {provided.placeholder}
-                                                  
-                                                  {/* Add Content Buttons */}
-                                                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                                                    </div>
+                                                  );
+                                                })
+                                              )}
+                                              
+                                              {/* Add Content Buttons */}
+                                              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
                                                 <button
                                                   onClick={async (e) => {
                                                     e.stopPropagation();
@@ -2109,10 +2148,8 @@ export default function ModulesPage() {
                                                 >
                                                   + PDF
                                                 </button>
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </Droppable>
+                                              </div>
+                                            </div>
                                           </motion.div>
                                         )}
                                       </AnimatePresence>

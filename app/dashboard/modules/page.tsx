@@ -1678,13 +1678,6 @@ export default function ModulesPage() {
                                                                         alt="Content preview"
                                                                       />
                                                                     </div>
-                                                                    <input
-                                                                      type="text"
-                                                                      value={block.caption || ""}
-                                                                      onChange={(e) => updateBlockField(block.id, "caption", e.target.value)}
-                                                                      placeholder="Image caption (optional)"
-                                                                      className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm mb-3 focus:ring-2 focus:ring-[#6EC1E4] focus:border-[#6EC1E4] transition"
-                                                                    />
                                                                     <button
                                                                       type="button"
                                                                       onClick={() => {
@@ -1694,7 +1687,7 @@ export default function ModulesPage() {
                                                                           input.click();
                                                                         }
                                                                       }}
-                                                                      className="px-4 py-2 bg-[#E8F4FA] text-[#0A2C57] rounded-lg text-sm font-semibold hover:bg-[#d3edf9] cursor-pointer transition"
+                                                                      className="px-4 py-2 bg-[#E8F4FA] text-[#0A2C57] rounded-lg text-sm font-semibold hover:bg-[#d3edf9] cursor-pointer transition mb-3"
                                                                     >
                                                                       Change Image
                                                                     </button>
@@ -1708,12 +1701,19 @@ export default function ModulesPage() {
                                                                         input.click();
                                                                       }
                                                                     }}
-                                                                    className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-[#6EC1E4] cursor-pointer transition"
+                                                                    className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-[#6EC1E4] cursor-pointer transition mb-3"
                                                                   >
                                                                     <ImageIcon size={32} className="mb-2" />
                                                                     <span className="text-sm font-medium">Click to upload image</span>
                                                                   </div>
                                                                 )}
+                                                                <input
+                                                                  type="text"
+                                                                  value={block.caption || ""}
+                                                                  onChange={(e) => updateBlockField(block.id, "caption", e.target.value)}
+                                                                  placeholder="Image caption (optional)"
+                                                                  className="w-full border-2 border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#6EC1E4] focus:border-[#6EC1E4] transition"
+                                                                />
                                                               </div>
                                                             )}
                                                             {block.type === "video" && (

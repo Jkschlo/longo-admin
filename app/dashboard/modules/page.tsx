@@ -1511,20 +1511,71 @@ export default function ModulesPage() {
                         <DragDropContext
                           onDragEnd={async (result) => {
                             if (!result.destination) return;
-                            const reordered = Array.from(blocks);
-                            const [removed] = reordered.splice(result.source.index, 1);
-                            reordered.splice(result.destination.index, 0, removed);
-                            const updated = reordered.map((b, i) => ({ ...b, order_index: i }));
-                            setBlocks(updated);
-
-                            if (editModuleId) {
-                              const realBlocks = updated.filter((b) => b.id && !b.id.startsWith("temp-"));
-                              if (realBlocks.length > 0) {
-                                await supabase
-                                  .from("module_content")
-                                  .upsert(realBlocks.map((b) => ({ id: b.id, order_index: b.order_index })));
+                            
+                            const sourceIndex = result.source.index;
+                            const destIndex = result.destination.index;
+                            const draggedBlock = blocks[sourceIndex];
+                            
+                            // Check if dragging a section block
+                            if (draggedBlock.type === "section") {
+                              // Find all blocks that belong to this section (until next section)
+                              const sectionStartIndex = sourceIndex;
+                              let sectionEndIndex = blocks.length;
+                              
+                              // Find the next section after this one
+                              for (let i = sourceIndex + 1; i < blocks.length; i++) {
+                                if (blocks[i].type === "section") {
+                                  sectionEndIndex = i;
+                                  break;
+                                }
                               }
-                              await syncModuleJSON(editModuleId, updated);
+                              
+                              // Get all blocks in this section (section + its content)
+                              const sectionBlocks = blocks.slice(sectionStartIndex, sectionEndIndex);
+                              
+                              // Remove the section and its blocks
+                              const reordered = Array.from(blocks);
+                              reordered.splice(sectionStartIndex, sectionBlocks.length);
+                              
+                              // Calculate new destination index (adjust if dragging forward)
+                              let newDestIndex = destIndex;
+                              if (destIndex > sourceIndex) {
+                                newDestIndex = destIndex - sectionBlocks.length + 1;
+                              }
+                              
+                              // Insert section and its blocks at new position
+                              reordered.splice(newDestIndex, 0, ...sectionBlocks);
+                              
+                              // Update order indices
+                              const updated = reordered.map((b, i) => ({ ...b, order_index: i }));
+                              setBlocks(updated);
+
+                              if (editModuleId) {
+                                const realBlocks = updated.filter((b) => b.id && !b.id.startsWith("temp-"));
+                                if (realBlocks.length > 0) {
+                                  await supabase
+                                    .from("module_content")
+                                    .upsert(realBlocks.map((b) => ({ id: b.id, order_index: b.order_index })));
+                                }
+                                await syncModuleJSON(editModuleId, updated);
+                              }
+                            } else {
+                              // Regular block drag (non-section)
+                              const reordered = Array.from(blocks);
+                              const [removed] = reordered.splice(sourceIndex, 1);
+                              reordered.splice(destIndex, 0, removed);
+                              const updated = reordered.map((b, i) => ({ ...b, order_index: i }));
+                              setBlocks(updated);
+
+                              if (editModuleId) {
+                                const realBlocks = updated.filter((b) => b.id && !b.id.startsWith("temp-"));
+                                if (realBlocks.length > 0) {
+                                  await supabase
+                                    .from("module_content")
+                                    .upsert(realBlocks.map((b) => ({ id: b.id, order_index: b.order_index })));
+                                }
+                                await syncModuleJSON(editModuleId, updated);
+                              }
                             }
                           }}
                         >
@@ -1533,56 +1584,77 @@ export default function ModulesPage() {
                               <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
                                 {sections.map(({ section, blocks: sectionBlocks, sectionIndex }) => {
                                   const isExpanded = expandedSections.has(sectionIndex);
+                                  const sectionGlobalIndex = blocks.findIndex((b) => b.id === section.id);
 
                                   return (
-                                    <div
+                                    <Draggable
                                       key={section.id || `section-${sectionIndex}`}
-                                      className="border-2 border-gray-200 rounded-lg overflow-hidden bg-white"
+                                      draggableId={section.id || `section-${sectionIndex}`}
+                                      index={sectionGlobalIndex}
                                     >
-                                      {/* Section Header */}
-                                      <div
-                                        className="flex items-center gap-3 p-4 bg-gradient-to-r from-[#E8F4FA] to-[#f0f8fc] cursor-pointer hover:from-[#d3edf9] hover:to-[#e5f4fa] transition"
-                                        onClick={() => {
-                                          setExpandedSections((prev) => {
-                                            const next = new Set(prev);
-                                            if (next.has(sectionIndex)) {
-                                              next.delete(sectionIndex);
-                                            } else {
-                                              next.add(sectionIndex);
-                                            }
-                                            return next;
-                                          });
-                                        }}
-                                      >
-                                        <ChevronDown
-                                          size={20}
-                                          className={`text-[#0A2C57] transition-transform ${
-                                            isExpanded ? "rotate-0" : "-rotate-90"
+                                      {(provided, snapshot) => (
+                                        <div
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          className={`border-2 rounded-lg overflow-hidden bg-white transition-all ${
+                                            snapshot.isDragging
+                                              ? "shadow-xl border-[#6EC1E4] scale-105"
+                                              : "border-gray-200"
                                           }`}
-                                        />
-                                        <input
-                                          type="text"
-                                          value={section.content || ""}
-                                          onChange={(e) => {
-                                            e.stopPropagation();
-                                            updateBlockField(section.id, "content", e.target.value);
-                                          }}
-                                          onClick={(e) => e.stopPropagation()}
-                                          placeholder="Section Title"
-                                          className="flex-1 bg-transparent border-none text-lg font-semibold text-[#0A2C57] focus:outline-none focus:ring-2 focus:ring-[#6EC1E4] rounded px-2 py-1"
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            removeBlock(section.id);
-                                          }}
-                                          className="hover:bg-red-50 rounded-full p-1.5 transition"
-                                          title="Delete section"
                                         >
-                                          <X size={18} className="text-red-500" />
-                                        </button>
-                                      </div>
+                                          {/* Section Header */}
+                                          <div
+                                            className="flex items-center gap-3 p-4 bg-gradient-to-r from-[#E8F4FA] to-[#f0f8fc] cursor-pointer hover:from-[#d3edf9] hover:to-[#e5f4fa] transition"
+                                            onClick={() => {
+                                              setExpandedSections((prev) => {
+                                                const next = new Set(prev);
+                                                if (next.has(sectionIndex)) {
+                                                  next.delete(sectionIndex);
+                                                } else {
+                                                  next.add(sectionIndex);
+                                                }
+                                                return next;
+                                              });
+                                            }}
+                                          >
+                                            {/* Drag Handle */}
+                                            <div
+                                              {...provided.dragHandleProps}
+                                              onClick={(e) => e.stopPropagation()}
+                                              className="cursor-grab active:cursor-grabbing p-1 hover:bg-white/20 rounded transition"
+                                              title="Drag to reorder section"
+                                            >
+                                              <GripVertical size={20} className="text-[#0A2C57] hover:text-[#6EC1E4]" />
+                                            </div>
+                                            <ChevronDown
+                                              size={20}
+                                              className={`text-[#0A2C57] transition-transform ${
+                                                isExpanded ? "rotate-0" : "-rotate-90"
+                                              }`}
+                                            />
+                                            <input
+                                              type="text"
+                                              value={section.content || ""}
+                                              onChange={(e) => {
+                                                e.stopPropagation();
+                                                updateBlockField(section.id, "content", e.target.value);
+                                              }}
+                                              onClick={(e) => e.stopPropagation()}
+                                              placeholder="Section Title"
+                                              className="flex-1 bg-transparent border-none text-lg font-semibold text-[#0A2C57] focus:outline-none focus:ring-2 focus:ring-[#6EC1E4] rounded px-2 py-1"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeBlock(section.id);
+                                              }}
+                                              className="hover:bg-red-50 rounded-full p-1.5 transition"
+                                              title="Delete section"
+                                            >
+                                              <X size={18} className="text-red-500" />
+                                            </button>
+                                          </div>
 
                                       {/* Section Content - Accordion */}
                                       <AnimatePresence>
@@ -1991,7 +2063,9 @@ export default function ModulesPage() {
                                           </motion.div>
                                         )}
                                       </AnimatePresence>
-                                    </div>
+                                        </div>
+                                      )}
+                                    </Draggable>
                                   );
                                 })}
                                 {provided.placeholder}

@@ -479,20 +479,47 @@ export default function ModulesPage() {
   };
 
   const removeBlock = async (blockId?: string) => {
-    if (!blockId) return;
-    
-    // For temp blocks, just remove from state
-    if (blockId.startsWith("temp-")) {
-      setBlocks(blocks.filter((b) => b.id !== blockId));
+    if (!blockId) {
+      setUploadError("Cannot delete: Block ID is missing.");
       return;
     }
     
-    // For real blocks, delete from database
-    supabase.from("module_content").delete().eq("id", blockId).catch(console.error);
-    const updated = blocks.filter((b) => b.id !== blockId);
-    setBlocks(updated);
-    // Sync JSON in background (non-blocking)
-    if (editModuleId) syncModuleJSON(editModuleId, updated).catch(console.error);
+    try {
+      // For temp blocks, just remove from state
+      if (blockId.startsWith("temp-")) {
+        const updated = blocks.filter((b) => b.id !== blockId);
+        setBlocks(updated);
+        return;
+      }
+      
+      // For real blocks, delete from database with proper error handling
+      const { error: deleteError } = await supabase
+        .from("module_content")
+        .delete()
+        .eq("id", blockId);
+      
+      if (deleteError) {
+        console.error("Error deleting block:", deleteError);
+        setUploadError(`Failed to delete block: ${deleteError.message}. Please try again.`);
+        return;
+      }
+      
+      // Only update state if delete was successful
+      const updated = blocks.filter((b) => b.id !== blockId);
+      setBlocks(updated);
+      
+      // Sync JSON in background (non-blocking)
+      if (editModuleId) {
+        syncModuleJSON(editModuleId, updated).catch((err) => {
+          console.error("Error syncing JSON after block deletion:", err);
+          // Don't show error to user for background sync failures
+        });
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred while deleting the block.";
+      console.error("Unexpected error in removeBlock:", err);
+      setUploadError(`Failed to delete block: ${errorMessage}. Please try again.`);
+    }
   };
 
   const handleContentImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, blockId?: string) => {

@@ -383,14 +383,29 @@ export default function ModulesPage() {
     const block = blocks[blockIndex];
     if (block.type === "section") return; // Don't move sections with this function
     
-    // Find the section this block belongs to
-    let sectionStartIndex = blockIndex;
-    while (sectionStartIndex > 0 && blocks[sectionStartIndex - 1].type !== "section") {
+    // Find the section header this block belongs to
+    // Walk backwards from the block above until we find a section block
+    let sectionStartIndex = blockIndex - 1;
+    while (sectionStartIndex >= 0 && blocks[sectionStartIndex].type !== "section") {
       sectionStartIndex--;
     }
     
-    // Check if this is the first content block in the section
+    // If we didn't find a section header, something is wrong
+    if (sectionStartIndex < 0) return;
+    
+    // Check if this is the first content block in the section (right after section header)
+    // sectionStartIndex is the section header, so first content block is at sectionStartIndex + 1
     if (blockIndex === sectionStartIndex + 1) return; // Already at the top of section
+    
+    // Verify the block above is not a section (should be a content block)
+    if (blocks[blockIndex - 1].type === "section") {
+      // This shouldn't happen if our logic is correct, but handle it anyway
+      return;
+    }
+    
+    // Check if the block above is a section (shouldn't happen, but safety check)
+    const blockAbove = blocks[blockIndex - 1];
+    if (blockAbove.type === "section") return; // Can't move above a section header
     
     // Swap with the block above
     const reordered = Array.from(blocks);
@@ -431,11 +446,15 @@ export default function ModulesPage() {
     const block = blocks[blockIndex];
     if (block.type === "section") return; // Don't move sections with this function
     
-    // Find the section this block belongs to
+    // Find the section header this block belongs to
+    // Walk backwards from the current block until we find a section block
     let sectionStartIndex = blockIndex;
-    while (sectionStartIndex > 0 && blocks[sectionStartIndex - 1].type !== "section") {
+    while (sectionStartIndex >= 0 && blocks[sectionStartIndex].type !== "section") {
       sectionStartIndex--;
     }
+    
+    // If we didn't find a section header, something is wrong
+    if (sectionStartIndex < 0) return;
     
     // Find the end of this section (next section or end of array)
     let sectionEndIndex = blocks.length;

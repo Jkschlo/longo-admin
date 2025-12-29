@@ -1512,18 +1512,21 @@ export default function ModulesPage() {
                           onDragEnd={async (result) => {
                             if (!result.destination) return;
                             
+                            const sourceDroppableId = result.source.droppableId;
+                            const destDroppableId = result.destination.droppableId;
                             const sourceIndex = result.source.index;
                             const destIndex = result.destination.index;
-                            const draggedBlock = blocks[sourceIndex];
                             
-                            // Check if dragging a section block
-                            if (draggedBlock.type === "section") {
+                            // Check if dragging a section (sections are in "sections" droppable)
+                            if (sourceDroppableId === "sections" && destDroppableId === "sections") {
+                              const draggedSection = sections[sourceIndex];
+                              
                               // Find all blocks that belong to this section (until next section)
-                              const sectionStartIndex = sourceIndex;
+                              const sectionStartIndex = blocks.findIndex((b) => b.id === draggedSection.section.id);
                               let sectionEndIndex = blocks.length;
                               
                               // Find the next section after this one
-                              for (let i = sourceIndex + 1; i < blocks.length; i++) {
+                              for (let i = sectionStartIndex + 1; i < blocks.length; i++) {
                                 if (blocks[i].type === "section") {
                                   sectionEndIndex = i;
                                   break;
@@ -1533,14 +1536,18 @@ export default function ModulesPage() {
                               // Get all blocks in this section (section + its content)
                               const sectionBlocks = blocks.slice(sectionStartIndex, sectionEndIndex);
                               
+                              // Find destination section
+                              const destSection = sections[destIndex];
+                              const destSectionStartIndex = blocks.findIndex((b) => b.id === destSection.section.id);
+                              
                               // Remove the section and its blocks
                               const reordered = Array.from(blocks);
                               reordered.splice(sectionStartIndex, sectionBlocks.length);
                               
                               // Calculate new destination index (adjust if dragging forward)
-                              let newDestIndex = destIndex;
-                              if (destIndex > sourceIndex) {
-                                newDestIndex = destIndex - sectionBlocks.length + 1;
+                              let newDestIndex = destSectionStartIndex;
+                              if (destSectionStartIndex > sectionStartIndex) {
+                                newDestIndex = destSectionStartIndex - sectionBlocks.length;
                               }
                               
                               // Insert section and its blocks at new position
@@ -1559,11 +1566,46 @@ export default function ModulesPage() {
                                 }
                                 await syncModuleJSON(editModuleId, updated);
                               }
-                            } else {
-                              // Regular block drag (non-section)
-                              const reordered = Array.from(blocks);
-                              const [removed] = reordered.splice(sourceIndex, 1);
-                              reordered.splice(destIndex, 0, removed);
+                            } 
+                            // Check if dragging a content block within a section
+                            else if (sourceDroppableId.startsWith("section-") && destDroppableId.startsWith("section-")) {
+                              // Only allow dragging within the same section
+                              if (sourceDroppableId !== destDroppableId) {
+                                return; // Prevent cross-section dragging
+                              }
+                              
+                              const sectionId = sourceDroppableId.replace("section-", "");
+                              const section = sections.find((s) => s.section.id === sectionId);
+                              if (!section) return;
+                              
+                              // Get the section's blocks in order
+                              const sectionStartIndex = blocks.findIndex((b) => b.id === section.section.id);
+                              let sectionEndIndex = blocks.length;
+                              
+                              // Find the next section after this one
+                              for (let i = sectionStartIndex + 1; i < blocks.length; i++) {
+                                if (blocks[i].type === "section") {
+                                  sectionEndIndex = i;
+                                  break;
+                                }
+                              }
+                              
+                              // Get only content blocks (excluding the section header)
+                              const contentBlocks = blocks.slice(sectionStartIndex + 1, sectionEndIndex);
+                              
+                              // Reorder within the section
+                              const reorderedContent = Array.from(contentBlocks);
+                              const [removed] = reorderedContent.splice(sourceIndex, 1);
+                              reorderedContent.splice(destIndex, 0, removed);
+                              
+                              // Rebuild the full blocks array
+                              const reordered = [
+                                ...blocks.slice(0, sectionStartIndex + 1),
+                                ...reorderedContent,
+                                ...blocks.slice(sectionEndIndex)
+                              ];
+                              
+                              // Update order indices
                               const updated = reordered.map((b, i) => ({ ...b, order_index: i }));
                               setBlocks(updated);
 
@@ -1579,18 +1621,17 @@ export default function ModulesPage() {
                             }
                           }}
                         >
-                          <Droppable droppableId="blocks">
+                          <Droppable droppableId="sections">
                             {(provided) => (
                               <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
                                 {sections.map(({ section, blocks: sectionBlocks, sectionIndex }) => {
                                   const isExpanded = expandedSections.has(sectionIndex);
-                                  const sectionGlobalIndex = blocks.findIndex((b) => b.id === section.id);
 
                                   return (
                                     <Draggable
                                       key={section.id || `section-${sectionIndex}`}
                                       draggableId={section.id || `section-${sectionIndex}`}
-                                      index={sectionGlobalIndex}
+                                      index={sectionIndex}
                                     >
                                       {(provided, snapshot) => (
                                         <div
@@ -1666,20 +1707,29 @@ export default function ModulesPage() {
                                             transition={{ duration: 0.2 }}
                                             className="overflow-hidden"
                                           >
-                                            <div className="p-4 space-y-3 bg-gray-50">
-                                              {sectionBlocks.length === 0 ? (
-                                                <p className="text-sm text-gray-400 text-center py-4">
-                                                  No content in this section. Add content below.
-                                                </p>
-                                              ) : (
-                                                sectionBlocks.map((block) => {
-                                                  const globalIndex = blocks.findIndex((b) => b.id === block.id);
-                                                  return (
-                                                    <Draggable
-                                                      key={block.id || `block-${globalIndex}`}
-                                                      draggableId={block.id || `block-${globalIndex}`}
-                                                      index={globalIndex}
-                                                    >
+                                            <Droppable droppableId={`section-${section.id || sectionIndex}`}>
+                                              {(provided) => (
+                                                <div 
+                                                  {...provided.droppableProps} 
+                                                  ref={provided.innerRef}
+                                                  className="p-4 space-y-3 bg-gray-50"
+                                                >
+                                                  {sectionBlocks.length === 0 ? (
+                                                    <p className="text-sm text-gray-400 text-center py-4">
+                                                      No content in this section. Add content below.
+                                                    </p>
+                                                  ) : (
+                                                    sectionBlocks.map((block, blockIndex) => {
+                                                      // Calculate global index for this block (for IDs)
+                                                      const sectionStartIndex = blocks.findIndex((b) => b.id === section.id);
+                                                      const globalIndex = sectionStartIndex >= 0 ? sectionStartIndex + 1 + blockIndex : blockIndex;
+                                                      
+                                                      return (
+                                                        <Draggable
+                                                          key={block.id || `block-${blockIndex}`}
+                                                          draggableId={block.id || `block-${blockIndex}`}
+                                                          index={blockIndex}
+                                                        >
                                                       {(provided, snapshot) => (
                                                         <div
                                                           ref={provided.innerRef}
@@ -1735,7 +1785,7 @@ export default function ModulesPage() {
                                                             {block.type === "image" && (
                                                               <div>
                                                                 <input
-                                                                  id={`content-image-${block.id || globalIndex}`}
+                                                                  id={`content-image-${block.id || `block-${blockIndex}`}`}
                                                                   type="file"
                                                                   accept="image/*"
                                                                   className="hidden"
@@ -1753,7 +1803,7 @@ export default function ModulesPage() {
                                                                     <button
                                                                       type="button"
                                                                       onClick={() => {
-                                                                        const input = document.getElementById(`content-image-${block.id || globalIndex}`) as HTMLInputElement;
+                                                                        const input = document.getElementById(`content-image-${block.id || `block-${blockIndex}`}`) as HTMLInputElement;
                                                                         if (input) {
                                                                           input.value = "";
                                                                           input.click();
@@ -1767,7 +1817,7 @@ export default function ModulesPage() {
                                                                 ) : (
                                                                   <div
                                                                     onClick={() => {
-                                                                      const input = document.getElementById(`content-image-${block.id || globalIndex}`) as HTMLInputElement;
+                                                                      const input = document.getElementById(`content-image-${block.id || `block-${blockIndex}`}`) as HTMLInputElement;
                                                                       if (input) {
                                                                         input.value = "";
                                                                         input.click();
@@ -1810,7 +1860,7 @@ export default function ModulesPage() {
                                                             {block.type === "pdf" && (
                                                               <div>
                                                                 <input
-                                                                  id={`content-pdf-${block.id || globalIndex}`}
+                                                                  id={`content-pdf-${block.id || `block-${blockIndex}`}`}
                                                                   type="file"
                                                                   accept="application/pdf,.pdf"
                                                                   className="hidden"
@@ -1861,7 +1911,7 @@ export default function ModulesPage() {
                                                                       e.stopPropagation();
                                                                       e.preventDefault();
                                                                       
-                                                                      const blockId = block.id || `temp-${globalIndex}`;
+                                                                      const blockId = block.id || `temp-block-${blockIndex}`;
                                                                       const inputId = `content-pdf-${blockId}`;
                                                                       
                                                                       console.log("PDF upload clicked - Block ID:", blockId, "Input ID:", inputId);
@@ -1874,7 +1924,7 @@ export default function ModulesPage() {
                                                                         const allPDFInputs = document.querySelectorAll('input[type="file"][accept*="pdf"]');
                                                                         console.log("Found PDF inputs:", allPDFInputs.length);
                                                                         for (const inp of Array.from(allPDFInputs)) {
-                                                                          if (inp.id.includes(blockId) || inp.id.includes(String(globalIndex))) {
+                                                                          if (inp.id.includes(blockId) || inp.id.includes(`block-${blockIndex}`)) {
                                                                             input = inp as HTMLInputElement;
                                                                             console.log("Found input by fallback:", inp.id);
                                                                             break;
@@ -1890,7 +1940,7 @@ export default function ModulesPage() {
                                                                           input.click();
                                                                         }, 10);
                                                                       } else {
-                                                                        console.error(`PDF input not found: ${inputId}. Block ID: ${blockId}, Global Index: ${globalIndex}`);
+                                                                        console.error(`PDF input not found: ${inputId}. Block ID: ${blockId}, Block Index: ${blockIndex}`);
                                                                         console.error("Available PDF inputs:", Array.from(document.querySelectorAll('input[type="file"][accept*="pdf"]')).map(i => i.id));
                                                                         setUploadError("Error: Could not find file input. Please refresh and try again.");
                                                                       }
@@ -1907,12 +1957,13 @@ export default function ModulesPage() {
                                                         </div>
                                                       )}
                                                     </Draggable>
-                                                  );
-                                                })
-                                              )}
-
-                                              {/* Add Content Buttons */}
-                                              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                                                      );
+                                                    })
+                                                  )}
+                                                  {provided.placeholder}
+                                                  
+                                                  {/* Add Content Buttons */}
+                                                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
                                                 <button
                                                   onClick={async (e) => {
                                                     e.stopPropagation();
@@ -2058,8 +2109,10 @@ export default function ModulesPage() {
                                                 >
                                                   + PDF
                                                 </button>
-                                              </div>
-                                            </div>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </Droppable>
                                           </motion.div>
                                         )}
                                       </AnimatePresence>

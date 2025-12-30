@@ -189,7 +189,11 @@ function ManageRolesModal({
                 onChange={(e) => setRoleName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    editingId ? saveEdit(editingId) : createRole();
+                    if (editingId) {
+                      saveEdit(editingId);
+                    } else {
+                      createRole();
+                    }
                   }
                 }}
                 placeholder="Enter role name..."

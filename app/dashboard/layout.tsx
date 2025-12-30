@@ -118,7 +118,7 @@ export default function AdminLayout({
             setIsLoadingEmail(false);
             // Preserve authentication state if we were previously authenticated
             // This prevents the UI from blocking when switching tabs
-            if (hasAuthenticatedRef.current && isAuthenticated !== true) {
+            if (hasAuthenticatedRef.current) {
               // If we've authenticated before, preserve that state on transient errors
               setIsAuthenticated(true);
             }
@@ -150,7 +150,7 @@ export default function AdminLayout({
             setIsLoadingEmail(false);
             // Preserve authentication state - don't block UI on transient session issues
             // The session timeout hook will handle actual logout
-            if (hasAuthenticatedRef.current && isAuthenticated !== true) {
+            if (hasAuthenticatedRef.current) {
               setIsAuthenticated(true);
             }
           }
@@ -195,7 +195,7 @@ export default function AdminLayout({
           if (mountedRef.current) {
             setIsLoadingEmail(false);
             // Preserve authentication state to prevent UI blocking
-            if (hasAuthenticatedRef.current && isAuthenticated !== true) {
+            if (hasAuthenticatedRef.current) {
               setIsAuthenticated(true);
             }
           }
@@ -300,7 +300,7 @@ export default function AdminLayout({
         if (mountedRef.current) {
           setIsLoadingEmail(false);
           // Preserve authentication state to prevent UI blocking on transient errors
-          if (hasAuthenticatedRef.current && isAuthenticated !== true) {
+          if (hasAuthenticatedRef.current) {
             setIsAuthenticated(true);
           }
         }

@@ -298,7 +298,7 @@ export default function ModulesPage() {
       .filter((b) => b.id && !b.id.startsWith("temp-"));
     
     // Batch the updates and insert in parallel for better performance
-    const [updateResult, insertResult] = await Promise.all([
+    const [, insertResult] = await Promise.all([
       blocksToUpdate.length > 0 ? supabase.from("module_content").upsert(blocksToUpdate) : Promise.resolve({ error: null }),
       supabase.from("module_content").insert([{ module_id: editModuleId, type, content: "", caption: "", order_index: insertIndex }]).select().single()
     ]);
@@ -1823,10 +1823,6 @@ export default function ModulesPage() {
                                                 </p>
                                               ) : (
                                                 sectionBlocks.map((block, blockIndex) => {
-                                                  // Calculate global index for this block (for IDs)
-                                                  const sectionStartIndex = blocks.findIndex((b) => b.id === section.id);
-                                                  const globalIndex = sectionStartIndex >= 0 ? sectionStartIndex + 1 + blockIndex : blockIndex;
-                                                  
                                                   // Check if this is the first or last block in the section
                                                   const isFirstBlock = blockIndex === 0;
                                                   const isLastBlock = blockIndex === sectionBlocks.length - 1;

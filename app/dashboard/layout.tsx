@@ -42,6 +42,7 @@ export default function AdminLayout({
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null = checking, true = authenticated, false = not authenticated
   const mountedRef = useRef(true);
   const extendSessionRef = useRef<(() => void) | null>(null);
+  const hasAuthenticatedRef = useRef(false); // Track if we've ever successfully authenticated
 
   // Session timeout handler - defined early so it can be used in session timeout hook
   const handleSessionTimeout = useCallback(async () => {
@@ -105,15 +106,22 @@ export default function AdminLayout({
           }
           if (mountedRef.current) {
             setIsAuthenticated(false);
+            hasAuthenticatedRef.current = false;
             setIsLoadingEmail(false);
             router.replace("/login");
           }
           return;
         } else {
-          // Network/timeout error - don't redirect, just log
+          // Network/timeout error - don't redirect, preserve auth state
           console.warn("Session check network error (non-critical):", sessionError.message);
           if (mountedRef.current) {
             setIsLoadingEmail(false);
+            // Preserve authentication state if we were previously authenticated
+            // This prevents the UI from blocking when switching tabs
+            if (hasAuthenticatedRef.current && isAuthenticated !== true) {
+              // If we've authenticated before, preserve that state on transient errors
+              setIsAuthenticated(true);
+            }
           }
           return;
         }
@@ -130,6 +138,7 @@ export default function AdminLayout({
           }
           if (mountedRef.current) {
             setIsAuthenticated(false);
+            hasAuthenticatedRef.current = false;
             setIsLoadingEmail(false);
             router.replace("/login");
           }
@@ -139,6 +148,11 @@ export default function AdminLayout({
           console.warn("No session found in periodic check");
           if (mountedRef.current) {
             setIsLoadingEmail(false);
+            // Preserve authentication state - don't block UI on transient session issues
+            // The session timeout hook will handle actual logout
+            if (hasAuthenticatedRef.current && isAuthenticated !== true) {
+              setIsAuthenticated(true);
+            }
           }
         }
         return;
@@ -172,13 +186,18 @@ export default function AdminLayout({
           await supabase.auth.signOut();
           if (mountedRef.current) {
             setIsAuthenticated(false);
+            hasAuthenticatedRef.current = false;
             setIsLoadingEmail(false);
             router.replace("/login");
           }
         } else {
-          // Periodic check - just log, don't redirect
+          // Periodic check - just log, don't redirect, preserve auth state
           if (mountedRef.current) {
             setIsLoadingEmail(false);
+            // Preserve authentication state to prevent UI blocking
+            if (hasAuthenticatedRef.current && isAuthenticated !== true) {
+              setIsAuthenticated(true);
+            }
           }
         }
         return;
@@ -189,6 +208,7 @@ export default function AdminLayout({
         await supabase.auth.signOut();
         if (mountedRef.current) {
           setIsAuthenticated(false);
+          hasAuthenticatedRef.current = false;
           setIsLoadingEmail(false);
           router.replace("/login");
         }
@@ -200,6 +220,7 @@ export default function AdminLayout({
       if (mountedRef.current) {
         setEmail(prof.email || "");
         setIsAuthenticated(true);
+        hasAuthenticatedRef.current = true; // Mark that we've successfully authenticated
         setIsLoadingEmail(false);
         // Reset session timeout activity timer on successful check
         // This ensures that periodic checks don't cause premature timeouts
@@ -224,6 +245,7 @@ export default function AdminLayout({
         // Real auth error - session is invalid, redirect to login
         if (mountedRef.current) {
           setIsAuthenticated(false);
+          hasAuthenticatedRef.current = false;
           setIsLoadingEmail(false);
           router.replace("/login");
         }
@@ -243,6 +265,7 @@ export default function AdminLayout({
             if (prof?.is_admin && mountedRef.current) {
               setEmail(prof.email || "");
               setIsAuthenticated(true);
+              hasAuthenticatedRef.current = true;
               setIsLoadingEmail(false);
               return;
             }
@@ -250,6 +273,7 @@ export default function AdminLayout({
           // Retry failed or not admin - redirect
           if (mountedRef.current) {
             setIsAuthenticated(false);
+            hasAuthenticatedRef.current = false;
             setIsLoadingEmail(false);
             router.replace("/login");
           }
@@ -257,6 +281,7 @@ export default function AdminLayout({
           // Retry also failed - redirect to login
           if (mountedRef.current) {
             setIsAuthenticated(false);
+            hasAuthenticatedRef.current = false;
             setIsLoadingEmail(false);
             router.replace("/login");
           }
@@ -265,6 +290,7 @@ export default function AdminLayout({
         // Other error on initial check - redirect to login
         if (mountedRef.current) {
           setIsAuthenticated(false);
+          hasAuthenticatedRef.current = false;
           setIsLoadingEmail(false);
           router.replace("/login");
         }
@@ -273,6 +299,10 @@ export default function AdminLayout({
         // The session timeout hook will handle logout if user is actually inactive
         if (mountedRef.current) {
           setIsLoadingEmail(false);
+          // Preserve authentication state to prevent UI blocking on transient errors
+          if (hasAuthenticatedRef.current && isAuthenticated !== true) {
+            setIsAuthenticated(true);
+          }
         }
       }
     }
@@ -287,6 +317,11 @@ export default function AdminLayout({
     const handleVisibility = () => {
       if (document.visibilityState === "visible" && mountedRef.current) {
         const now = Date.now();
+        // Extend session activity when tab becomes visible
+        // This prevents session timeout when switching tabs
+        if (extendSessionRef.current) {
+          extendSessionRef.current();
+        }
         // Only check if it's been at least 30 seconds since last check
         // This prevents excessive checks when tabbing back and forth
         if (now - lastVisibilityCheck > VISIBILITY_CHECK_COOLDOWN) {
@@ -320,6 +355,7 @@ export default function AdminLayout({
         if (event === "SIGNED_OUT" || !session) {
           if (mountedRef.current) {
             setIsAuthenticated(false);
+            hasAuthenticatedRef.current = false;
             setIsLoadingEmail(false);
             router.replace("/login");
           }
